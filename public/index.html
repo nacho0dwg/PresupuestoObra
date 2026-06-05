@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Presupuesto de Obra — Córdoba</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <header>
+    <div class="header-contenido">
+      <h1>Calculadora de Presupuesto de Obra</h1>
+      <p class="subtitulo">Valores referenciales para Córdoba, Argentina</p>
+    </div>
+    <button class="btn-info" id="btnInfo" title="Estado de datos">&#9432;</button>
+  </header>
+
+  <!-- Panel de estado -->
+  <div class="panel-estado" id="panelEstado" hidden>
+    <div class="panel-estado-contenido">
+      <h3>Estado de datos</h3>
+      <div class="estado-fila">
+        <span class="estado-label">Fuente</span>
+        <span id="estadoFuente">—</span>
+      </div>
+      <div class="estado-fila">
+        <span class="estado-label">Mes del PDF</span>
+        <span id="estadoMes">—</span>
+      </div>
+      <div class="estado-fila">
+        <span class="estado-label">Precio m² base (PDF)</span>
+        <span id="estadoBaseTotal">—</span>
+      </div>
+      <div class="estado-seccion" id="estadoSeccionICC">
+        <div class="estado-fila">
+          <span class="estado-label">Actualización ICC</span>
+          <span id="estadoICC">—</span>
+        </div>
+        <div class="estado-fila">
+          <span class="estado-label">Precio m² actualizado</span>
+          <span id="estadoTotal">—</span>
+        </div>
+      </div>
+      <div class="estado-fila">
+        <span class="estado-label">Última verificación</span>
+        <span id="estadoVerificacion">—</span>
+      </div>
+      <button class="btn-actualizar" id="btnActualizar">Verificar actualizaciones</button>
+      <div id="estadoMensaje" class="estado-mensaje" hidden></div>
+      <button class="btn-cerrar" id="btnCerrarPanel">Cerrar</button>
+    </div>
+  </div>
+  <div class="overlay" id="overlay" hidden></div>
+
+  <main>
+    <!-- Formulario -->
+    <section class="tarjeta" id="seccionFormulario">
+      <h2>Datos de la obra</h2>
+      <form id="formulario" novalidate>
+
+        <div class="campo">
+          <label for="metros">Metros cuadrados totales *</label>
+          <input type="number" id="metros" name="metros" min="1" max="9999"
+                 placeholder="Ej: 80" required />
+        </div>
+
+        <div class="campo">
+          <label for="tipoObra">Tipo de obra *</label>
+          <select id="tipoObra" name="tipoObra" required>
+            <option value="">— Seleccioná —</option>
+            <option value="nueva">Construcción nueva</option>
+            <option value="refaccion_parcial">Refacción parcial</option>
+            <option value="refaccion_total">Refacción total</option>
+          </select>
+        </div>
+
+        <div class="campo">
+          <label for="plantas">Cantidad de plantas *</label>
+          <select id="plantas" name="plantas" required>
+            <option value="">— Seleccioná —</option>
+            <option value="1">1 planta</option>
+            <option value="2">2 plantas</option>
+            <option value="3">3 plantas o más</option>
+          </select>
+        </div>
+
+        <div class="fila-doble">
+          <div class="campo">
+            <label for="ambientes">Ambientes</label>
+            <input type="number" id="ambientes" name="ambientes" min="1" max="20"
+                   placeholder="Ej: 3" />
+          </div>
+          <div class="campo">
+            <label for="banios">Baños *</label>
+            <input type="number" id="banios" name="banios" min="1" max="10"
+                   placeholder="Ej: 1" required />
+          </div>
+        </div>
+
+        <div class="campo">
+          <label for="cocinas">Cocinas *</label>
+          <input type="number" id="cocinas" name="cocinas" min="1" max="3"
+                 placeholder="Ej: 1" required />
+        </div>
+
+        <div class="campo">
+          <label for="terminaciones">Calidad de terminaciones *</label>
+          <select id="terminaciones" name="terminaciones" required>
+            <option value="">— Seleccioná —</option>
+            <option value="economica">Económica (−20%)</option>
+            <option value="estandar" selected>Estándar (base)</option>
+            <option value="premium">Premium (+35%)</option>
+            <option value="lujo">Lujo (+70%)</option>
+          </select>
+        </div>
+
+        <div id="errorFormulario" class="error-formulario" hidden></div>
+
+        <button type="submit" class="btn-calcular">Calcular presupuesto</button>
+
+      </form>
+    </section>
+
+    <!-- Resultado -->
+    <section class="tarjeta tarjeta-resultado" id="seccionResultado" hidden>
+      <h2>Presupuesto estimado</h2>
+
+      <div class="total-grande">
+        <span class="total-label">Total estimado</span>
+        <span class="total-valor" id="totalValor">—</span>
+      </div>
+
+      <div class="precio-m2-info">
+        <span id="infoFuente">—</span>
+      </div>
+
+      <h3>Desglose por categoría</h3>
+      <div class="desglose">
+        <div class="desglose-fila">
+          <span>Trámites y gestiones previas</span>
+          <span id="desgloseTramites">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Trabajos preliminares</span>
+          <span id="desglosePreliminares">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Estructura y obra gruesa (materiales)</span>
+          <span id="desgloseObraGruesa">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Mano de obra total</span>
+          <span id="desgloseManoDeObra">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Instalaciones (sanitaria, eléctrica, gas)</span>
+          <span id="desgloseInstalaciones">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Terminaciones</span>
+          <span id="desgloseTerminaciones">—</span>
+        </div>
+        <div class="desglose-fila">
+          <span>Honorarios profesionales</span>
+          <span id="desgloseHonorarios">—</span>
+        </div>
+        <div class="desglose-nota">
+          * Honorarios estimados al 5% del monto de obra. El valor final se acuerda con el comitente.
+        </div>
+        <div class="desglose-fila desglose-total">
+          <span>TOTAL</span>
+          <span id="desgloseTotalFinal">—</span>
+        </div>
+      </div>
+
+      <p class="aviso-legal">
+        Los valores son referenciales según datos del IEC/CPI Córdoba. No constituyen un
+        presupuesto definitivo de obra.
+      </p>
+
+      <div class="botones-resultado">
+        <button class="btn-secundario" id="btnNuevaConsulta">Nueva consulta</button>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <p>Datos basados en el IEC — CPI Córdoba · Actualización mensual</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

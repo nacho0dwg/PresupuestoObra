@@ -1,0 +1,2 @@
+Servidor corriendo en http://localhost:3000
+[Inicio] No se pudo obtener el PDF: No se encontró el PDF del IEC en CPI Córdoba. Usando datos en caché. ICC no disponible: getaddrinfo ENOTFOUND apis.indec.gob.ar.

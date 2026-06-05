@@ -1,0 +1,2 @@
+[Actualizador] Error PDF: No se encontró el PDF del IEC en CPI Córdoba
+[Actualizador] Error ICC: getaddrinfo ENOTFOUND apis.indec.gob.ar
