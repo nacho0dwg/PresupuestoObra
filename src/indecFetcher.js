@@ -8,31 +8,63 @@ const NOMBRES_MES = [
   'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre',
 ];
 
-// Convierte "2026-05-01" o "2026-05" en "Mayo 2026"
 function formatearMes(fechaStr) {
   const partes = fechaStr.split('-');
   return `${NOMBRES_MES[parseInt(partes[1])]} ${partes[0]}`;
 }
 
 // fechaDesde: string "YYYY-MM" del mes del PDF
-// Devuelve el factor acumulado de ICC y metadata para mostrar al usuario
 async function obtenerVariacionICC(fechaDesde) {
-  const url = `${URL_INDEC}?ids=${ID_ICC}&start_date=${fechaDesde}`;
-  const respuesta = await axios.get(url, {
-    timeout: 15000,
-    headers: { 'User-Agent': 'Mozilla/5.0' },
-  });
+  const opciones = { timeout: 15000, headers: { 'User-Agent': 'Mozilla/5.0' } };
+  let series = null;
+  let skipFirst = false; // si skipFirst=true, el primer elemento es el mes del PDF y se omite
+  const errores = [];
 
-  const series = respuesta.data?.data;
-  if (!series || series.length === 0) {
-    throw new Error('La API del INDEC no devolvió datos de ICC');
+  // Intento 1: con start_date (devuelve desde el mes del PDF en adelante)
+  try {
+    const resp = await axios.get(
+      `${URL_INDEC}?ids=${ID_ICC}&start_date=${fechaDesde}`,
+      opciones
+    );
+    const data = resp.data?.data;
+    if (data && data.length > 0) {
+      series = data;
+      skipFirst = true; // el primer elemento es el mes del PDF, ya incluido en el precio
+    }
+  } catch (err) {
+    errores.push(`start_date: ${err.message}`);
   }
 
-  // El primer elemento es el mes del PDF: su variación ya está incluida en el
-  // precio del PDF, por lo que se omite. Se aplica desde el mes siguiente.
+  // Intento 2: con limit=5 sin start_date, filtrando manualmente por fecha
+  if (!series) {
+    try {
+      const resp = await axios.get(
+        `${URL_INDEC}?ids=${ID_ICC}&limit=5`,
+        opciones
+      );
+      const data = resp.data?.data;
+      if (data && data.length > 0) {
+        // Solo los meses posteriores al mes del PDF
+        const filtrado = data.filter(e => e[0].substring(0, 7) > fechaDesde);
+        if (filtrado.length > 0) {
+          series = filtrado;
+          skipFirst = false; // ya están filtrados, se aplican todos
+        }
+      }
+    } catch (err) {
+      errores.push(`limit=5: ${err.message}`);
+    }
+  }
+
+  if (!series) {
+    throw new Error(`API INDEC no disponible (${errores.join(' / ')})`);
+  }
+
+  // Calcular factor acumulado
   let factor = 1;
   let mesesAplicados = 0;
-  for (let i = 1; i < series.length; i++) {
+  const inicio = skipFirst ? 1 : 0;
+  for (let i = inicio; i < series.length; i++) {
     const variacion = series[i][1];
     if (variacion !== null && variacion !== undefined) {
       factor *= (1 + variacion / 100);

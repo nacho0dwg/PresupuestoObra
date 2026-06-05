@@ -74,8 +74,9 @@ function actualizarPanelEstado() {
   const seccionICC = document.getElementById('estadoSeccionICC');
   if (p.actualizadoConICC) {
     seccionICC.style.display = '';
+    const etiquetaFuente = p.iccFuente === 'PDF' ? ' (estimado desde PDF)' : '';
     document.getElementById('estadoICC').textContent =
-      `+${p.variacionICC.toFixed(2)}% hasta ${p.iccHastaElMes}`;
+      `+${p.variacionICC.toFixed(2)}% hasta ${p.iccHastaElMes}${etiquetaFuente}`;
     document.getElementById('estadoTotal').textContent = formatearPesos(p.precioM2Total);
   } else {
     seccionICC.style.display = 'none';
