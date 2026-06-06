@@ -5,6 +5,8 @@
   padding: 0;
 }
 
+[hidden] { display: none !important; }
+
 /* ===== Variables ===== */
 :root {
   --fondo:        #F7F6F2;
@@ -1089,7 +1091,8 @@ html { transition: background-color 0.3s ease; }
 [data-theme="dark"] .campo input,
 [data-theme="dark"] .campo select {
   color: var(--negro);
-  background: transparent;
+  background-color: var(--fondo);
+  background-image: none;
 }
 
 [data-theme="dark"] .campo select {
