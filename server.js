@@ -158,10 +158,13 @@ app.get('/api/dolar', async (req, res) => {
 
   try {
     const resp = await axios.get('https://dolarapi.com/v1/dolares', { timeout: 8000 });
+    console.log('[Dolar] Respuesta raw:', JSON.stringify(resp.data));
     const blue    = resp.data.find(d => d.casa === 'blue');
     const oficial = resp.data.find(d => d.casa === 'oficial');
+    console.log('[Dolar] blue:', blue, '| oficial:', oficial);
     if (!blue && !oficial) throw new Error('Sin datos de dólar');
     const data = { blue: blue?.venta ?? null, oficial: oficial?.venta ?? null };
+    console.log('[Dolar] Enviando:', data);
     cache.dolar = { data, ts: ahora };
     res.json(data);
   } catch (err) {

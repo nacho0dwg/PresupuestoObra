@@ -883,11 +883,13 @@ body {
 /* ===== Conversión USD ===== */
 .conversion-usd {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  color: var(--texto-suave);
-  letter-spacing: 0.04em;
-  margin-top: 0.35rem;
-  margin-bottom: 0.25rem;
+  font-size: 0.87rem;
+  color: var(--negro);
+  letter-spacing: 0.03em;
+  margin-top: 0.75rem;
+  margin-bottom: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 0.5px solid var(--borde-medio);
 }
 
 /* ===== Botones resultado: 2x2 en desktop ===== */
