@@ -29,13 +29,47 @@ const DESGLOSE_PESOS = {
   honorarios:    0.05,
 };
 
+// Imágenes de arquitectura brutalista/minimalista — rotan cada 12 horas
+const IMAGENES_ARQ = [
+  {
+    url: 'https://images.unsplash.com/photo-1487958449943-2429e8be8625?w=440&auto=format&fit=crop&q=80',
+    nombre: 'BARBICAN CENTRE',
+    arquitecto: 'Chamberlin, Powell & Bon — 1982',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1518780664697-55e3ad937233?w=440&auto=format&fit=crop&q=80',
+    nombre: 'ESTRUCTURA EXPUESTA',
+    arquitecto: 'Brutalismo tardío — s. XX',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1486325212027-8081e485255e?w=440&auto=format&fit=crop&q=80',
+    nombre: 'GEOMETRÍA EN HORMIGÓN',
+    arquitecto: 'Movimiento Moderno',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1545324418-cc1a3fa10c00?w=440&auto=format&fit=crop&q=80',
+    nombre: 'PLANTA LIBRE',
+    arquitecto: 'Le Corbusier — 1952',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1523217582562-09d0def993a6?w=440&auto=format&fit=crop&q=80',
+    nombre: 'MASA Y VACÍO',
+    arquitecto: 'Tadao Ando — 1989',
+  },
+  {
+    url: 'https://images.unsplash.com/photo-1565117798655-7d0a7a96cfe2?w=440&auto=format&fit=crop&q=80',
+    nombre: 'SALK INSTITUTE',
+    arquitecto: 'Louis Kahn — 1965',
+  },
+];
+
 let preciosActuales = null;
 let datosActuales   = null;
 let resultadoActual = null;
 
 // ===== Formateo de números en formato argentino =====
 function formatearPesos(valor) {
-  return '$ ' + valor.toLocaleString('es-AR', {
+  return '$ ' + valor.toLocaleString('es-AR', {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
@@ -93,6 +127,28 @@ function actualizarPanelEstado() {
       });
   } else {
     document.getElementById('estadoVerificacion').textContent = 'Nunca';
+  }
+
+  actualizarHeaderMeta();
+}
+
+// ===== Actualizar meta del header con los precios actuales =====
+function actualizarHeaderMeta() {
+  if (!preciosActuales) return;
+  const p = preciosActuales;
+
+  const elMes = document.getElementById('headerMes');
+  const elICC = document.getElementById('headerICC');
+
+  if (elMes && p.mesReferencia) {
+    elMes.textContent = p.mesReferencia.toUpperCase();
+  }
+  if (elICC) {
+    if (p.actualizadoConICC && p.variacionICC != null) {
+      elICC.textContent = `ICC +${p.variacionICC.toFixed(1)}%`;
+    } else {
+      elICC.textContent = 'SIN ICC';
+    }
   }
 }
 
@@ -169,7 +225,7 @@ function mostrarResultado(resultado) {
   seccionResultado.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-// ===== Eventos =====
+// ===== Eventos del formulario =====
 document.getElementById('formulario').addEventListener('submit', function (e) {
   e.preventDefault();
 
@@ -248,8 +304,7 @@ document.getElementById('btnActualizar').addEventListener('click', async functio
   }
 });
 
-// ===== Exportar a PDF =====
-
+// ===== Etiquetas para el PDF =====
 const ETIQUETAS = {
   tipoObra: {
     nueva:             'Construcción nueva',
@@ -265,138 +320,177 @@ const ETIQUETAS = {
   },
 };
 
+// ===== Exportar a PDF — estética arquitectónica =====
 function generarPDF() {
   if (!datosActuales || !resultadoActual) return;
 
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
 
-  const M      = 18;          // margen izquierdo/derecho
-  const ANCHO  = 210 - M * 2; // 174mm ancho útil
-  const AZUL   = [26, 79, 122];
-  const NARANJA = [232, 119, 34];
-  const GRIS   = [90, 106, 120];
-  const NEGRO  = [30, 42, 53];
+  const M     = 18;
+  const ANCHO = 210 - M * 2;
+
+  // Paleta
+  const FONDO = [247, 246, 242];
+  const NEGRO = [26, 26, 26];
+  const ROJO  = [192, 57, 43];
+  const GRIS  = [130, 128, 120];
+  const BORDE = [205, 203, 197];
 
   const fechaHoy = new Date().toLocaleDateString('es-AR', {
     day: '2-digit', month: 'long', year: 'numeric',
   });
 
-  let y = 0;
+  // Fondo crema
+  doc.setFillColor(...FONDO);
+  doc.rect(0, 0, 210, 297, 'F');
 
-  // ── ENCABEZADO ──────────────────────────────────────────────────────────
-  doc.setFillColor(...AZUL);
-  doc.rect(0, 0, 210, 36, 'F');
+  // Marca de agua: grilla de cruces
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.18);
+  const PASO = 10;
+  const TAM  = 1.8;
+  for (let px = 5; px < 210; px += PASO) {
+    for (let py = 5; py < 297; py += PASO) {
+      doc.line(px, py - TAM, px, py + TAM);
+      doc.line(px - TAM, py, px + TAM, py);
+    }
+  }
 
-  doc.setTextColor(255, 255, 255);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(18);
-  doc.text('PresupuestoObra', M, 14);
+  // ── HEADER ──
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...NEGRO);
+  doc.text('PRESUPUESTO\xB7OBRA', M, 14);
 
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(9.5);
-  doc.text('Presupuesto de obra estimado', M, 22);
-  doc.text(`Generado el ${fechaHoy}`, M, 29);
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GRIS);
+  doc.text('C\xD3RDOBA \xB7 ARG', M, 20);
+  doc.text(`Generado el ${fechaHoy}`, 210 - M, 20, { align: 'right' });
 
-  y = 44;
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(M, 24, 210 - M, 24);
 
-  // ── PARÁMETROS ──────────────────────────────────────────────────────────
-  doc.setTextColor(...AZUL);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('PARAMETROS DE LA OBRA', M, y);
-  doc.setDrawColor(...AZUL);
-  doc.setLineWidth(0.4);
-  doc.line(M, y + 2, M + ANCHO, y + 2);
-  y += 8;
+  let y = 35;
+
+  // ── 01 PARÁMETROS ──
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...GRIS);
+  doc.text('01', M, y);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...NEGRO);
+  doc.text('PAR\xC1METROS DE LA OBRA', M + 6, y);
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(M, y + 2.5, 210 - M, y + 2.5);
+  y += 9;
 
   const d = datosActuales;
   const params = [
-    ['Superficie',     `${d.metros} m\xB2`],
-    ['Tipo de obra',   ETIQUETAS.tipoObra[d.tipoObra]],
-    ['Plantas',        ETIQUETAS.plantas[d.plantas]],
-    ['Ambientes',      d.ambientes ? String(d.ambientes) : 'No especificado'],
-    ['Ba\xF1os',       String(d.banios)],
-    ['Cocinas',        String(d.cocinas)],
-    ['Terminaciones',  ETIQUETAS.terminaciones[d.terminaciones]],
+    ['SUPERFICIE',     `${d.metros} m\xB2`],
+    ['TIPO DE OBRA',   ETIQUETAS.tipoObra[d.tipoObra]],
+    ['PLANTAS',        ETIQUETAS.plantas[d.plantas]],
+    ['AMBIENTES',      d.ambientes ? String(d.ambientes) : 'No especificado'],
+    ['BA\xD1OS',       String(d.banios)],
+    ['COCINAS',        String(d.cocinas)],
+    ['TERMINACIONES',  ETIQUETAS.terminaciones[d.terminaciones]],
   ];
 
-  doc.setFontSize(10);
   for (const [label, valor] of params) {
-    doc.setFont('helvetica', 'bold');
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(6.5);
     doc.setTextColor(...GRIS);
-    doc.text(label + ':', M, y);
-    doc.setFont('helvetica', 'normal');
+    doc.text(label, M, y);
     doc.setTextColor(...NEGRO);
-    doc.text(valor, M + 48, y);
+    doc.text(valor, M + 52, y);
+    doc.setDrawColor(...BORDE);
+    doc.setLineWidth(0.15);
+    doc.line(M, y + 2.2, 210 - M, y + 2.2);
     y += 7;
   }
 
-  y += 3;
+  y += 5;
 
-  // ── TOTAL DESTACADO ─────────────────────────────────────────────────────
-  doc.setFillColor(242, 244, 247);
-  doc.roundedRect(M, y, ANCHO, 22, 3, 3, 'F');
-  doc.setFillColor(...NARANJA);
-  doc.roundedRect(M, y, 4, 22, 2, 2, 'F');
+  // ── TOTAL DESTACADO ──
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(M, y, 210 - M, y);
+  y += 6;
 
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
   doc.setTextColor(...GRIS);
-  doc.text('TOTAL ESTIMADO', M + ANCHO / 2, y + 8, { align: 'center' });
-
-  doc.setFontSize(19);
-  doc.setTextColor(...AZUL);
-  doc.text(formatearPesos(resultadoActual.total), M + ANCHO / 2, y + 18, { align: 'center' });
-
-  y += 29;
-
-  // ── DESGLOSE ────────────────────────────────────────────────────────────
-  doc.setTextColor(...AZUL);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8);
-  doc.text('DESGLOSE POR CATEGORIA', M, y);
-  doc.setDrawColor(...AZUL);
-  doc.setLineWidth(0.4);
-  doc.line(M, y + 2, M + ANCHO, y + 2);
+  doc.text('TOTAL ESTIMADO', M, y);
   y += 8;
 
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(22);
+  doc.setTextColor(...ROJO);
+  doc.text(formatearPesos(resultadoActual.total), M, y);
+  y += 6;
+
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(M, y, 210 - M, y);
+  y += 11;
+
+  // ── 02 DESGLOSE ──
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...GRIS);
+  doc.text('02', M, y);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...NEGRO);
+  doc.text('DESGLOSE POR CATEGOR\xCDA', M + 6, y);
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(M, y + 2.5, 210 - M, y + 2.5);
+  y += 9;
+
   const categorias = [
-    ['Tramites y gestiones previas',           resultadoActual.desglose.tramites],
-    ['Trabajos preliminares',                  resultadoActual.desglose.preliminares],
-    ['Estructura y obra gruesa (materiales)',   resultadoActual.desglose.obraGruesa],
-    ['Mano de obra total',                     resultadoActual.desglose.manoDeObra],
-    ['Instalaciones (sanitaria, electrica, gas)', resultadoActual.desglose.instalaciones],
-    ['Terminaciones',                          resultadoActual.desglose.terminaciones],
-    ['Honorarios profesionales',               resultadoActual.desglose.honorarios],
+    ['Tramites y gestiones previas',               resultadoActual.desglose.tramites],
+    ['Trabajos preliminares',                      resultadoActual.desglose.preliminares],
+    ['Estructura y obra gruesa (materiales)',       resultadoActual.desglose.obraGruesa],
+    ['Mano de obra total',                         resultadoActual.desglose.manoDeObra],
+    ['Instalaciones (sanitaria, electrica, gas)',  resultadoActual.desglose.instalaciones],
+    ['Terminaciones',                              resultadoActual.desglose.terminaciones],
+    ['Honorarios profesionales',                   resultadoActual.desglose.honorarios],
   ];
 
-  doc.setFontSize(9.5);
   for (const [label, monto] of categorias) {
-    doc.setFont('helvetica', 'normal');
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(9);
     doc.setTextColor(...NEGRO);
-    doc.text(label, M + 2, y);
-    doc.setFont('helvetica', 'bold');
-    doc.text(formatearPesos(monto), M + ANCHO, y, { align: 'right' });
-    y += 6.5;
-    doc.setDrawColor(208, 216, 224);
+    doc.text(label, M, y);
+    doc.setFont('courier', 'bold');
+    doc.text(formatearPesos(monto), 210 - M, y, { align: 'right' });
+    y += 5.5;
+    doc.setDrawColor(...BORDE);
     doc.setLineWidth(0.15);
-    doc.line(M, y - 1.5, M + ANCHO, y - 1.5);
+    doc.line(M, y - 1, 210 - M, y - 1);
   }
 
   // Fila total del desglose
-  doc.setFillColor(...AZUL);
-  doc.rect(M, y - 1, ANCHO, 8, 'F');
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9.5);
-  doc.setTextColor(255, 255, 255);
-  doc.text('TOTAL', M + 2, y + 4.5);
-  doc.text(formatearPesos(resultadoActual.total), M + ANCHO, y + 4.5, { align: 'right' });
-  y += 14;
+  y += 3;
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...NEGRO);
+  doc.text('TOTAL', M, y);
+  doc.setTextColor(...ROJO);
+  doc.text(formatearPesos(resultadoActual.total), 210 - M, y, { align: 'right' });
+  doc.setDrawColor(...ROJO);
+  doc.setLineWidth(0.5);
+  doc.line(M, y + 2.5, 210 - M, y + 2.5);
+  y += 12;
 
-  // ── FUENTE DE PRECIOS ────────────────────────────────────────────────────
-  doc.setFontSize(8.5);
-  doc.setFont('helvetica', 'normal');
+  // ── FUENTE DE PRECIOS ──
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(7);
   doc.setTextColor(...GRIS);
   doc.text(`Precio m\xB2 aplicado: ${formatearPesos(resultadoActual.precioM2Aplicado)}`, M, y);
   y += 5.5;
@@ -408,35 +502,28 @@ function generarPDF() {
     fuenteTexto += `, actualizado con ${fuente} hasta ${p.iccHastaElMes || ''}`;
   }
   doc.text(fuenteTexto, M, y);
-  y += 10;
+  y += 11;
 
-  // ── AVISO LEGAL ──────────────────────────────────────────────────────────
-  doc.setFillColor(248, 249, 251);
-  doc.setDrawColor(208, 216, 224);
+  // ── AVISO LEGAL ──
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(1);
+  doc.line(M, y, M, y + 11);
   doc.setLineWidth(0.3);
-  doc.roundedRect(M, y, ANCHO, 13, 2, 2, 'FD');
-  doc.setFillColor(...NARANJA);
-  doc.roundedRect(M, y, 3, 13, 1, 1, 'F');
-
-  doc.setFontSize(8);
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(7);
   doc.setTextColor(...GRIS);
-  doc.text(
-    'Valores referenciales segun datos del IEC/CPI Cordoba.',
-    M + 6, y + 5.5
-  );
-  doc.text(
-    'No constituyen presupuesto definitivo de obra.',
-    M + 6, y + 10.5
-  );
+  doc.text('Valores referenciales segun datos del IEC/CPI Cordoba.', M + 4, y + 4);
+  doc.text('No constituyen presupuesto definitivo de obra.', M + 4, y + 9.5);
 
-  // ── PIE DE PÁGINA ────────────────────────────────────────────────────────
-  doc.setFillColor(...AZUL);
-  doc.rect(0, 285, 210, 12, 'F');
-  doc.setFontSize(8);
-  doc.setFont('helvetica', 'normal');
-  doc.setTextColor(255, 255, 255);
-  doc.text('PresupuestoObra — Cordoba, Argentina', M, 292);
-  doc.text(fechaHoy, 210 - M, 292, { align: 'right' });
+  // ── PIE ──
+  doc.setDrawColor(...BORDE);
+  doc.setLineWidth(0.3);
+  doc.line(0, 284, 210, 284);
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...GRIS);
+  doc.text('PRESUPUESTO\xB7OBRA — C\xF3rdoba, Argentina', M, 290);
+  doc.text(fechaHoy, 210 - M, 290, { align: 'right' });
 
   const nombre = `presupuesto-${new Date().toISOString().substring(0, 10)}.pdf`;
   doc.save(nombre);
@@ -444,5 +531,92 @@ function generarPDF() {
 
 document.getElementById('btnExportarPDF').addEventListener('click', generarPDF);
 
+// ===== Rotación de imagen arquitectónica (cada 12 horas) =====
+function iniciarRotacionImagenes() {
+  const img      = document.getElementById('imagenArq');
+  const capNombre = document.getElementById('captionNombre');
+  const capArq    = document.getElementById('captionArq');
+  const countdown = document.getElementById('imagenCountdown');
+
+  if (!img) return;
+
+  const INTERVALO_MS = 12 * 60 * 60 * 1000;
+  const periodo      = Math.floor(Date.now() / INTERVALO_MS);
+  const indice       = periodo % IMAGENES_ARQ.length;
+  const imagen       = IMAGENES_ARQ[indice];
+
+  img.src = imagen.url;
+  if (capNombre) capNombre.textContent = imagen.nombre;
+  if (capArq)    capArq.textContent    = imagen.arquitecto;
+
+  function actualizarCountdown() {
+    if (!countdown) return;
+    const ahora      = Date.now();
+    const proximoCambio = (periodo + 1) * INTERVALO_MS;
+    const restante   = proximoCambio - ahora;
+    const horas      = Math.floor(restante / (60 * 60 * 1000));
+    const minutos    = Math.floor((restante % (60 * 60 * 1000)) / (60 * 1000));
+    countdown.textContent = `↻ cambia en ${horas}h ${minutos}m`;
+  }
+
+  actualizarCountdown();
+  setInterval(actualizarCountdown, 60 * 1000);
+}
+
+// ===== Drawer de noticias (mobile) =====
+function iniciarDrawerNoticias() {
+  const colNoticias   = document.getElementById('colNoticias');
+  const btnDrawer     = document.getElementById('btnDrawerMobile');
+  const drawerOverlay = document.getElementById('drawerOverlay');
+
+  if (!colNoticias || !btnDrawer) return;
+
+  let drawerAbierto = false;
+
+  function abrirDrawer() {
+    drawerAbierto = true;
+    colNoticias.classList.add('drawer-open');
+    btnDrawer.classList.add('activo');
+    if (drawerOverlay) drawerOverlay.classList.add('visible');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function cerrarDrawer() {
+    drawerAbierto = false;
+    colNoticias.classList.remove('drawer-open');
+    btnDrawer.classList.remove('activo');
+    if (drawerOverlay) drawerOverlay.classList.remove('visible');
+    document.body.style.overflow = '';
+  }
+
+  btnDrawer.addEventListener('click', () => {
+    drawerAbierto ? cerrarDrawer() : abrirDrawer();
+  });
+
+  if (drawerOverlay) {
+    drawerOverlay.addEventListener('click', cerrarDrawer);
+  }
+
+  // Swipe desde el borde derecho para abrir, swipe a la derecha para cerrar
+  let touchStartX = 0;
+
+  document.addEventListener('touchstart', (e) => {
+    touchStartX = e.touches[0].clientX;
+  }, { passive: true });
+
+  document.addEventListener('touchend', (e) => {
+    const deltaX        = e.changedTouches[0].clientX - touchStartX;
+    const desdeElBorde  = touchStartX > window.innerWidth - 32;
+
+    if (desdeElBorde && deltaX < -30 && !drawerAbierto) {
+      abrirDrawer();
+    } else if (drawerAbierto && deltaX > 50) {
+      cerrarDrawer();
+    }
+  }, { passive: true });
+}
+
 // ===== Inicialización =====
 cargarPrecios();
+iniciarRotacionImagenes();
+iniciarDrawerNoticias();
