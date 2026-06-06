@@ -308,6 +308,25 @@ main {
   color: white;
 }
 
+.btn-pdf {
+  flex: 1;
+  min-width: 130px;
+  background: var(--color-acento);
+  color: white;
+  border: 2px solid var(--color-acento);
+  border-radius: 8px;
+  padding: 0.7rem 1rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-pdf:hover {
+  background: #cf6510;
+  border-color: #cf6510;
+}
+
 /* ===== Panel de estado (modal) ===== */
 .overlay {
   position: fixed;

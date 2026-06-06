@@ -1,15 +1,15 @@
 {
   "mesReferencia": "Marzo 2026",
-  "precioM2Basico": 1438836.6805899998,
-  "precioM2Total": 1798470.7191899999,
+  "precioM2Basico": 1469052.2508823895,
+  "precioM2Total": 1836238.6042929897,
   "precioM2BasicoOriginal": 1395573.89,
   "precioM2TotalOriginal": 1744394.49,
   "fuente": "IEC - CPI Córdoba",
   "urlPDF": null,
   "fechaPDF": "2026-03-01",
   "actualizadoConICC": true,
-  "variacionICC": 3.1,
-  "iccHastaElMes": "Abril 2026",
-  "ultimaVerificacion": "2026-06-05T23:15:02.838Z",
+  "variacionICC": 5.27,
+  "iccHastaElMes": "Mayo 2026",
+  "ultimaVerificacion": "2026-06-06T01:26:30.839Z",
   "iccFuente": "histórico"
 }

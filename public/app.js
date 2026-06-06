@@ -30,6 +30,8 @@ const DESGLOSE_PESOS = {
 };
 
 let preciosActuales = null;
+let datosActuales   = null;
+let resultadoActual = null;
 
 // ===== Formateo de números en formato argentino =====
 function formatearPesos(valor) {
@@ -186,12 +188,15 @@ document.getElementById('formulario').addEventListener('submit', function (e) {
     metros:        parseFloat(document.getElementById('metros').value),
     tipoObra:      document.getElementById('tipoObra').value,
     plantas:       document.getElementById('plantas').value,
+    ambientes:     parseInt(document.getElementById('ambientes').value) || null,
     banios:        parseInt(document.getElementById('banios').value) || 1,
     cocinas:       parseInt(document.getElementById('cocinas').value) || 1,
     terminaciones: document.getElementById('terminaciones').value,
   };
 
+  datosActuales   = datos;
   const resultado = calcularPresupuesto(datos);
+  resultadoActual = resultado;
   mostrarResultado(resultado);
 });
 
@@ -242,6 +247,202 @@ document.getElementById('btnActualizar').addEventListener('click', async functio
     btn.textContent = 'Verificar actualizaciones';
   }
 });
+
+// ===== Exportar a PDF =====
+
+const ETIQUETAS = {
+  tipoObra: {
+    nueva:             'Construcción nueva',
+    refaccion_parcial: 'Refacción parcial',
+    refaccion_total:   'Refacción total',
+  },
+  plantas: { '1': '1 planta', '2': '2 plantas', '3': '3 plantas o más' },
+  terminaciones: {
+    economica: 'Económica',
+    estandar:  'Estándar',
+    premium:   'Premium',
+    lujo:      'Lujo',
+  },
+};
+
+function generarPDF() {
+  if (!datosActuales || !resultadoActual) return;
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+
+  const M      = 18;          // margen izquierdo/derecho
+  const ANCHO  = 210 - M * 2; // 174mm ancho útil
+  const AZUL   = [26, 79, 122];
+  const NARANJA = [232, 119, 34];
+  const GRIS   = [90, 106, 120];
+  const NEGRO  = [30, 42, 53];
+
+  const fechaHoy = new Date().toLocaleDateString('es-AR', {
+    day: '2-digit', month: 'long', year: 'numeric',
+  });
+
+  let y = 0;
+
+  // ── ENCABEZADO ──────────────────────────────────────────────────────────
+  doc.setFillColor(...AZUL);
+  doc.rect(0, 0, 210, 36, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(18);
+  doc.text('PresupuestoObra', M, 14);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(9.5);
+  doc.text('Presupuesto de obra estimado', M, 22);
+  doc.text(`Generado el ${fechaHoy}`, M, 29);
+
+  y = 44;
+
+  // ── PARÁMETROS ──────────────────────────────────────────────────────────
+  doc.setTextColor(...AZUL);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('PARAMETROS DE LA OBRA', M, y);
+  doc.setDrawColor(...AZUL);
+  doc.setLineWidth(0.4);
+  doc.line(M, y + 2, M + ANCHO, y + 2);
+  y += 8;
+
+  const d = datosActuales;
+  const params = [
+    ['Superficie',     `${d.metros} m\xB2`],
+    ['Tipo de obra',   ETIQUETAS.tipoObra[d.tipoObra]],
+    ['Plantas',        ETIQUETAS.plantas[d.plantas]],
+    ['Ambientes',      d.ambientes ? String(d.ambientes) : 'No especificado'],
+    ['Ba\xF1os',       String(d.banios)],
+    ['Cocinas',        String(d.cocinas)],
+    ['Terminaciones',  ETIQUETAS.terminaciones[d.terminaciones]],
+  ];
+
+  doc.setFontSize(10);
+  for (const [label, valor] of params) {
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...GRIS);
+    doc.text(label + ':', M, y);
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...NEGRO);
+    doc.text(valor, M + 48, y);
+    y += 7;
+  }
+
+  y += 3;
+
+  // ── TOTAL DESTACADO ─────────────────────────────────────────────────────
+  doc.setFillColor(242, 244, 247);
+  doc.roundedRect(M, y, ANCHO, 22, 3, 3, 'F');
+  doc.setFillColor(...NARANJA);
+  doc.roundedRect(M, y, 4, 22, 2, 2, 'F');
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text('TOTAL ESTIMADO', M + ANCHO / 2, y + 8, { align: 'center' });
+
+  doc.setFontSize(19);
+  doc.setTextColor(...AZUL);
+  doc.text(formatearPesos(resultadoActual.total), M + ANCHO / 2, y + 18, { align: 'center' });
+
+  y += 29;
+
+  // ── DESGLOSE ────────────────────────────────────────────────────────────
+  doc.setTextColor(...AZUL);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8);
+  doc.text('DESGLOSE POR CATEGORIA', M, y);
+  doc.setDrawColor(...AZUL);
+  doc.setLineWidth(0.4);
+  doc.line(M, y + 2, M + ANCHO, y + 2);
+  y += 8;
+
+  const categorias = [
+    ['Tramites y gestiones previas',           resultadoActual.desglose.tramites],
+    ['Trabajos preliminares',                  resultadoActual.desglose.preliminares],
+    ['Estructura y obra gruesa (materiales)',   resultadoActual.desglose.obraGruesa],
+    ['Mano de obra total',                     resultadoActual.desglose.manoDeObra],
+    ['Instalaciones (sanitaria, electrica, gas)', resultadoActual.desglose.instalaciones],
+    ['Terminaciones',                          resultadoActual.desglose.terminaciones],
+    ['Honorarios profesionales',               resultadoActual.desglose.honorarios],
+  ];
+
+  doc.setFontSize(9.5);
+  for (const [label, monto] of categorias) {
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...NEGRO);
+    doc.text(label, M + 2, y);
+    doc.setFont('helvetica', 'bold');
+    doc.text(formatearPesos(monto), M + ANCHO, y, { align: 'right' });
+    y += 6.5;
+    doc.setDrawColor(208, 216, 224);
+    doc.setLineWidth(0.15);
+    doc.line(M, y - 1.5, M + ANCHO, y - 1.5);
+  }
+
+  // Fila total del desglose
+  doc.setFillColor(...AZUL);
+  doc.rect(M, y - 1, ANCHO, 8, 'F');
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text('TOTAL', M + 2, y + 4.5);
+  doc.text(formatearPesos(resultadoActual.total), M + ANCHO, y + 4.5, { align: 'right' });
+  y += 14;
+
+  // ── FUENTE DE PRECIOS ────────────────────────────────────────────────────
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(...GRIS);
+  doc.text(`Precio m\xB2 aplicado: ${formatearPesos(resultadoActual.precioM2Aplicado)}`, M, y);
+  y += 5.5;
+
+  const p = preciosActuales || {};
+  let fuenteTexto = `Base: ${p.mesReferencia || ''}`;
+  if (p.actualizadoConICC) {
+    const fuente = p.iccFuente === 'historico' ? 'datos historicos' : (p.iccFuente || 'ICC');
+    fuenteTexto += `, actualizado con ${fuente} hasta ${p.iccHastaElMes || ''}`;
+  }
+  doc.text(fuenteTexto, M, y);
+  y += 10;
+
+  // ── AVISO LEGAL ──────────────────────────────────────────────────────────
+  doc.setFillColor(248, 249, 251);
+  doc.setDrawColor(208, 216, 224);
+  doc.setLineWidth(0.3);
+  doc.roundedRect(M, y, ANCHO, 13, 2, 2, 'FD');
+  doc.setFillColor(...NARANJA);
+  doc.roundedRect(M, y, 3, 13, 1, 1, 'F');
+
+  doc.setFontSize(8);
+  doc.setTextColor(...GRIS);
+  doc.text(
+    'Valores referenciales segun datos del IEC/CPI Cordoba.',
+    M + 6, y + 5.5
+  );
+  doc.text(
+    'No constituyen presupuesto definitivo de obra.',
+    M + 6, y + 10.5
+  );
+
+  // ── PIE DE PÁGINA ────────────────────────────────────────────────────────
+  doc.setFillColor(...AZUL);
+  doc.rect(0, 285, 210, 12, 'F');
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(255, 255, 255);
+  doc.text('PresupuestoObra — Cordoba, Argentina', M, 292);
+  doc.text(fechaHoy, 210 - M, 292, { align: 'right' });
+
+  const nombre = `presupuesto-${new Date().toISOString().substring(0, 10)}.pdf`;
+  doc.save(nombre);
+}
+
+document.getElementById('btnExportarPDF').addEventListener('click', generarPDF);
 
 // ===== Inicialización =====
 cargarPrecios();
