@@ -379,7 +379,7 @@ body {
 .desglose-fila span:first-child {
   font-family: var(--font-sans);
   font-size: 0.88rem;
-  color: rgba(0, 0, 0, 0.62);
+  color: var(--texto-suave);
 }
 
 .desglose-fila span:last-child {
