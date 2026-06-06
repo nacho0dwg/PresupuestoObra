@@ -2,14 +2,6 @@ const dataStore = require('./dataStore');
 const pdfFetcher = require('./pdfFetcher');
 const indecFetcher = require('./indecFetcher');
 
-const NOMBRES_MES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio',
-                     'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre'];
-
-function mesActual() {
-  const hoy = new Date();
-  return `${NOMBRES_MES[hoy.getMonth()]} ${hoy.getFullYear()}`;
-}
-
 async function verificarYActualizar() {
   const resultado = {
     exito: false,
@@ -64,9 +56,6 @@ async function verificarYActualizar() {
 
   if (mesesDesdePDF >= 1) {
     const fechaDesde = nuevos.fechaPDF.substring(0, 7);
-    let iccAplicado = false;
-
-    // Intento A: API del INDEC
     try {
       const icc = await indecFetcher.obtenerVariacionICC(fechaDesde);
 
@@ -81,37 +70,16 @@ async function verificarYActualizar() {
           actualizadoConICC: true,
           variacionICC:      icc.variacionTotal,
           iccHastaElMes:     icc.hastaElMes,
-          iccFuente:         'INDEC',
+          iccFuente:         icc.fuente,
         };
-        iccAplicado = true;
         resultado.iccAplicado = true;
-        resultado.mensaje += ` ICC INDEC aplicado: +${icc.variacionTotal}% hasta ${icc.hastaElMes}.`;
-        console.log(`[Actualizador] ICC INDEC: +${icc.variacionTotal}% hasta ${icc.hastaElMes}`);
+        resultado.mensaje +=
+          ` ICC aplicado (${icc.fuente}): +${icc.variacionTotal}% hasta ${icc.hastaElMes}.`;
+        console.log(`[Actualizador] ICC (${icc.fuente}): +${icc.variacionTotal}% hasta ${icc.hastaElMes}`);
       }
     } catch (err) {
-      console.warn('[Actualizador] ICC INDEC no disponible:', err.message);
-      resultado.mensaje += ` ICC INDEC no disponible: ${err.message}.`;
-    }
-
-    // Intento B: variación del propio PDF como fallback
-    if (!iccAplicado && nuevos.variacionMensualPDF) {
-      const varMensual = nuevos.variacionMensualPDF;
-      const factor = Math.pow(1 + varMensual / 100, mesesDesdePDF);
-      const baseBasico = nuevos.precioM2BasicoOriginal || nuevos.precioM2Basico;
-      const baseTotal  = nuevos.precioM2TotalOriginal  || nuevos.precioM2Total;
-
-      nuevos = {
-        ...nuevos,
-        precioM2Basico:    baseBasico * factor,
-        precioM2Total:     baseTotal  * factor,
-        actualizadoConICC: true,
-        variacionICC:      Math.round((factor - 1) * 10000) / 100,
-        iccHastaElMes:     mesActual(),
-        iccFuente:         'PDF',
-      };
-      resultado.iccAplicado = true;
-      resultado.mensaje += ` Estimado desde variación del PDF (${varMensual}%/mes × ${mesesDesdePDF} meses).`;
-      console.log(`[Actualizador] ICC estimado desde PDF: ${varMensual}%/mes × ${mesesDesdePDF} meses`);
+      resultado.mensaje += ` ICC no disponible: ${err.message}.`;
+      console.error('[Actualizador] Error ICC:', err.message);
     }
   }
 

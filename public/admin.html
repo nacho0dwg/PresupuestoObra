@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Administración — Presupuesto Obra</title>
+  <link rel="stylesheet" href="style.css" />
+  <style>
+    .admin-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+    @media (max-width: 640px) { .admin-grid { grid-template-columns: 1fr; } }
+
+    .tabla-icc { width: 100%; border-collapse: collapse; font-size: 0.95rem; }
+    .tabla-icc th {
+      background: var(--color-primario);
+      color: white;
+      padding: 0.6rem 1rem;
+      text-align: left;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .tabla-icc td { padding: 0.65rem 1rem; border-bottom: 1px solid var(--color-borde); }
+    .tabla-icc tr:last-child td { border-bottom: none; }
+    .tabla-icc tr:hover td { background: #f5f8fb; }
+    .tabla-icc .variacion-pos { color: #1a6632; font-weight: 600; }
+    .tabla-icc .variacion-neg { color: var(--color-error); font-weight: 600; }
+    .tabla-vacia { text-align: center; color: var(--color-texto-suave); padding: 1.5rem; font-style: italic; }
+
+    .precio-actual { background: var(--color-fondo); border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.25rem; }
+    .precio-actual-fila { display: flex; justify-content: space-between; padding: 0.4rem 0; font-size: 0.92rem; border-bottom: 1px solid var(--color-borde); }
+    .precio-actual-fila:last-child { border-bottom: none; }
+    .precio-actual-fila span:first-child { color: var(--color-texto-suave); }
+    .precio-actual-fila span:last-child { font-weight: 600; }
+
+    .badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      padding: 0.15rem 0.5rem;
+      border-radius: 20px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+    }
+    .badge-icc { background: #e0f0e8; color: #1a6632; }
+    .badge-sin-icc { background: #f0f0f0; color: #888; }
+
+    .nav-volver { font-size: 0.85rem; color: rgba(255,255,255,0.8); text-decoration: none; }
+    .nav-volver:hover { color: white; }
+
+    .btn-recalcular {
+      width: 100%;
+      background: var(--color-primario);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.85rem;
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background 0.2s;
+      margin-top: 0.5rem;
+    }
+    .btn-recalcular:hover:not(:disabled) { background: var(--color-primario-oscuro); }
+    .btn-recalcular:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .mensaje-accion {
+      font-size: 0.85rem;
+      padding: 0.6rem 0.9rem;
+      border-radius: 6px;
+      margin-top: 0.75rem;
+    }
+    .mensaje-ok    { background: #eaf7ee; color: #1a6632; border: 1px solid #b2dfbf; }
+    .mensaje-error { background: #fdf0ef; color: var(--color-error); border: 1px solid #e8b4b0; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="header-contenido">
+      <h1>Administración — ICC</h1>
+      <p class="subtitulo">Gestión del historial de variaciones del costo de la construcción</p>
+    </div>
+    <a href="/" class="nav-volver">← Calculadora</a>
+  </header>
+
+  <main>
+    <div class="admin-grid">
+
+      <!-- Columna izquierda: historial + precio actual -->
+      <div>
+        <section class="tarjeta">
+          <h2>Precio m² actual</h2>
+          <div class="precio-actual" id="precioActual">
+            <div class="tabla-vacia">Cargando…</div>
+          </div>
+          <button class="btn-recalcular" id="btnRecalcular">Recalcular precio</button>
+          <div id="mensajeRecalcular" hidden></div>
+        </section>
+
+        <section class="tarjeta">
+          <h2>Historial de variaciones ICC</h2>
+          <table class="tabla-icc">
+            <thead>
+              <tr>
+                <th>Mes</th>
+                <th>Variación mensual</th>
+              </tr>
+            </thead>
+            <tbody id="cuerpoTabla">
+              <tr><td colspan="2" class="tabla-vacia">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </section>
+      </div>
+
+      <!-- Columna derecha: formulario -->
+      <div>
+        <section class="tarjeta">
+          <h2>Agregar variación ICC</h2>
+
+          <form id="formICC" novalidate>
+            <div class="campo">
+              <label for="selMes">Mes</label>
+              <select id="selMes" required>
+                <option value="01">Enero</option>
+                <option value="02">Febrero</option>
+                <option value="03">Marzo</option>
+                <option value="04">Abril</option>
+                <option value="05">Mayo</option>
+                <option value="06">Junio</option>
+                <option value="07">Julio</option>
+                <option value="08">Agosto</option>
+                <option value="09">Septiembre</option>
+                <option value="10">Octubre</option>
+                <option value="11">Noviembre</option>
+                <option value="12">Diciembre</option>
+              </select>
+            </div>
+
+            <div class="campo">
+              <label for="selAnio">Año</label>
+              <select id="selAnio" required></select>
+            </div>
+
+            <div class="campo">
+              <label for="inputVariacion">Variación % mensual</label>
+              <input type="number" id="inputVariacion" step="0.01" placeholder="Ej: 2.10"
+                     required />
+              <small style="color:var(--color-texto-suave);font-size:0.78rem;margin-top:0.25rem;display:block">
+                Usar número negativo para baja. Ej: −1.5
+              </small>
+            </div>
+
+            <div id="errorForm" class="error-formulario" hidden></div>
+
+            <button type="submit" class="btn-calcular">Agregar</button>
+            <div id="mensajeForm" hidden></div>
+          </form>
+        </section>
+      </div>
+
+    </div>
+  </main>
+
+  <footer>
+    <p>Panel de administración — uso interno</p>
+  </footer>
+
+  <script src="admin.js"></script>
+</body>
+</html>

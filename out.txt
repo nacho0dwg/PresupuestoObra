@@ -1,2 +1,4 @@
 Servidor corriendo en http://localhost:3000
-[Inicio] No se pudo obtener el PDF: No se encontró el PDF del IEC en CPI Córdoba (/noticias/). Usando datos en caché. ICC INDEC no disponible: API INDEC no disponible (start_date: getaddrinfo ENOTFOUND apis.indec.gob.ar / limit=5: getaddrinfo ENOTFOUND apis.indec.gob.ar).
+[ICC] Usando histórico local: 1 mes(es) hasta Abril 2026
+[Actualizador] ICC (histórico): +3.1% hasta Abril 2026
+[Inicio] No se pudo obtener el PDF: No se encontró el PDF del IEC en CPI Córdoba (/noticias/). Usando datos en caché. ICC aplicado (histórico): +3.1% hasta Abril 2026.

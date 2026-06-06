@@ -1,0 +1,2 @@
+[Actualizador] Error PDF: No se encontró el PDF del IEC en CPI Córdoba (/noticias/)
+[ICC] Scraping web INDEC fallido: No se encontraron PDFs de ICC en la página del INDEC

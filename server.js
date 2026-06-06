@@ -3,6 +3,7 @@ const path = require('path');
 const cron = require('node-cron');
 const dataStore = require('./src/dataStore');
 const { verificarYActualizar } = require('./src/updater');
+const { leerHistorico, guardarHistoricoCompleto } = require('./src/indecFetcher');
 
 const app = express();
 const PUERTO = 3000;
@@ -26,6 +27,48 @@ app.post('/api/actualizar', async (req, res) => {
     res.json(resultado);
   } catch (error) {
     res.status(500).json({ exito: false, mensaje: error.message });
+  }
+});
+
+// Panel de administración
+app.get('/admin', (req, res) => {
+  res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+// Devuelve el historial ICC completo
+app.get('/api/icc', (req, res) => {
+  try {
+    res.json(leerHistorico());
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+// Agrega o actualiza una variación ICC en el histórico
+app.post('/api/icc', (req, res) => {
+  const { mes, variacion } = req.body;
+
+  if (!mes || !/^\d{4}-\d{2}$/.test(mes)) {
+    return res.status(400).json({ error: 'Formato de mes inválido. Use YYYY-MM' });
+  }
+  const varNum = parseFloat(variacion);
+  if (isNaN(varNum)) {
+    return res.status(400).json({ error: 'Variación inválida' });
+  }
+
+  try {
+    const historico = leerHistorico();
+    const idx = historico.findIndex(e => e.mes === mes);
+    if (idx >= 0) {
+      historico[idx].variacion = varNum;
+    } else {
+      historico.push({ mes, variacion: varNum });
+    }
+    guardarHistoricoCompleto(historico);
+    console.log(`[Admin] ICC guardado: ${mes} → ${varNum}%`);
+    res.json({ exito: true, historico });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
