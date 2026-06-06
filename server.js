@@ -1,9 +1,26 @@
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const cron = require('node-cron');
+const axios = require('axios');
+const RssParser = require('rss-parser');
 const dataStore = require('./src/dataStore');
 const { verificarYActualizar } = require('./src/updater');
 const { leerHistorico, guardarHistoricoCompleto } = require('./src/indecFetcher');
+
+let _pdfSF = null;
+try { _pdfSF = require('./src/pdfFetcherSF'); } catch { /* Steel Frame PDF fetcher no disponible */ }
+
+const rssParser = new RssParser({ timeout: 10000 });
+
+// Caches en memoria para endpoints externos
+const cache = {
+  imagen:   { data: null, ts: 0 },
+  noticias: { data: null, ts: 0 },
+  dolar:    { data: null, ts: 0 },
+  sf:       { data: null, ts: 0 },
+};
+const TTL = { imagen: 43200000, noticias: 21600000, dolar: 3600000, sf: 43200000 };
 
 const app = express();
 const PUERTO = 3000;
@@ -70,6 +87,117 @@ app.post('/api/icc', (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+// ─── Imagen de arquitectura (Unsplash) ───────────────────────────────────────
+app.get('/api/imagen-arquitectura', async (req, res) => {
+  const ahora = Date.now();
+  if (cache.imagen.data && ahora - cache.imagen.ts < TTL.imagen) return res.json(cache.imagen.data);
+
+  const key = process.env.UNSPLASH_ACCESS_KEY;
+  if (!key) return res.json({ fallback: true });
+
+  try {
+    const resp = await axios.get('https://api.unsplash.com/photos/random', {
+      params: { query: 'architecture brutalist concrete minimal', count: 6, orientation: 'portrait' },
+      headers: { Authorization: `Client-ID ${key}` },
+      timeout: 8000,
+    });
+    const fotos = resp.data.map(f => ({
+      url: f.urls.regular,
+      nombre: (f.description || f.alt_description || 'ARQUITECTURA').toUpperCase().substring(0, 40),
+      fotografo: f.user.name,
+      perfilUrl: `${f.user.links.html}?utm_source=presupuesto_obra&utm_medium=referral`,
+    }));
+    cache.imagen = { data: fotos, ts: ahora };
+    res.json(fotos);
+  } catch (err) {
+    console.warn('[Unsplash] Error:', err.message);
+    res.json({ fallback: true });
+  }
+});
+
+// ─── Noticias via RSS ─────────────────────────────────────────────────────────
+app.get('/api/noticias', async (req, res) => {
+  const ahora = Date.now();
+  if (cache.noticias.data && ahora - cache.noticias.ts < TTL.noticias) return res.json(cache.noticias.data);
+
+  const feeds = [
+    'https://www.plataformaarquitectura.cl/cl/rss',
+    'https://www.archdaily.cl/cl/rss',
+  ];
+
+  for (const feedUrl of feeds) {
+    try {
+      const feed = await rssParser.parseURL(feedUrl);
+      const items = feed.items.slice(0, 3).map(item => ({
+        titulo: item.title || '',
+        link: item.link || '',
+        fecha: item.pubDate
+          ? new Date(item.pubDate).toLocaleDateString('es-AR', { month: 'short', year: 'numeric' }).toUpperCase()
+          : '',
+        imagen: item.enclosure?.url
+          || item['media:content']?.['$']?.url
+          || item['media:thumbnail']?.['$']?.url
+          || null,
+        fuente: feed.title || '',
+      }));
+      cache.noticias = { data: items, ts: ahora };
+      return res.json(items);
+    } catch { /* intenta el siguiente feed */ }
+  }
+
+  cache.noticias = { data: [], ts: ahora };
+  res.json({ fallback: true, items: [] });
+});
+
+// ─── Cotización dólar (dolarapi.com) ─────────────────────────────────────────
+app.get('/api/dolar', async (req, res) => {
+  const ahora = Date.now();
+  if (cache.dolar.data && ahora - cache.dolar.ts < TTL.dolar) return res.json(cache.dolar.data);
+
+  try {
+    const resp = await axios.get('https://dolarapi.com/v1/dolares', { timeout: 8000 });
+    const blue    = resp.data.find(d => d.casa === 'blue');
+    const oficial = resp.data.find(d => d.casa === 'oficial');
+    if (!blue && !oficial) throw new Error('Sin datos de dólar');
+    const data = { blue: blue?.venta ?? null, oficial: oficial?.venta ?? null };
+    cache.dolar = { data, ts: ahora };
+    res.json(data);
+  } catch (err) {
+    console.warn('[Dolar] Error:', err.message);
+    res.json({ error: true });
+  }
+});
+
+// ─── Precios Steel Frame (PDF IEC) ────────────────────────────────────────────
+app.get('/api/precios-sf', async (req, res) => {
+  const ahora = Date.now();
+  if (cache.sf.data && ahora - cache.sf.ts < TTL.sf) return res.json(cache.sf.data);
+
+  if (_pdfSF) {
+    try {
+      const urlPDF = await _pdfSF.buscarURLPDF();
+      const datos  = await _pdfSF.descargarYParsearPDF(urlPDF);
+      const result = { ...datos, fuente: 'IEC - CPI Córdoba (Steel Frame)', esFallback: false };
+      cache.sf = { data: result, ts: ahora };
+      return res.json(result);
+    } catch (err) {
+      console.warn('[SF] PDF no encontrado:', err.message);
+    }
+  }
+
+  // Fallback: 0.92× del precio tradicional
+  const base = dataStore.leerPrecios();
+  const result = {
+    precioM2Total:  base.precioM2Total  * 0.92,
+    precioM2Basico: base.precioM2Basico * 0.92,
+    mesReferencia:  base.mesReferencia,
+    fuente:         'Estimado — PDF Steel Frame no disponible (0.92× tradicional)',
+    esFallback:     true,
+  };
+  cache.sf = { data: result, ts: ahora };
+  res.json(result);
 });
 
 // Verificación automática el día 12 de cada mes a las 9:00 AM

@@ -219,10 +219,26 @@ function mostrarResultado(resultado) {
   document.getElementById('desgloseHonorarios').textContent    = formatearPesos(resultado.desglose.honorarios);
   document.getElementById('desgloseTotalFinal').textContent    = formatearPesos(resultado.total);
 
+  // Nombre del proyecto
+  const elNombre = document.getElementById('resultadoNombre');
+  if (elNombre) {
+    const nombre = datosActuales?.nombreProyecto;
+    if (nombre) { elNombre.textContent = nombre.toUpperCase(); elNombre.hidden = false; }
+    else elNombre.hidden = true;
+  }
+
+  // Ocultar conversión USD hasta que cargue
+  const elUSD = document.getElementById('conversionUSD');
+  if (elUSD) elUSD.hidden = true;
+
   document.getElementById('seccionFormulario').hidden = true;
   const seccionResultado = document.getElementById('seccionResultado');
   seccionResultado.hidden = false;
   seccionResultado.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  // Cargar cotización y guardar en historial (no-blocking)
+  cargarDolar();
+  if (!cargandoDesdeHash) guardarEnHistorial();
 }
 
 // ===== Eventos del formulario =====
@@ -241,6 +257,7 @@ document.getElementById('formulario').addEventListener('submit', function (e) {
   divError.hidden = true;
 
   const datos = {
+    nombreProyecto: document.getElementById('nombreProyecto')?.value.trim() || null,
     metros:        parseFloat(document.getElementById('metros').value),
     tipoObra:      document.getElementById('tipoObra').value,
     plantas:       document.getElementById('plantas').value,
@@ -259,6 +276,10 @@ document.getElementById('formulario').addEventListener('submit', function (e) {
 document.getElementById('btnNuevaConsulta').addEventListener('click', function () {
   document.getElementById('seccionResultado').hidden = true;
   document.getElementById('seccionFormulario').hidden = false;
+  document.getElementById('comparativa').hidden = true;
+  document.getElementById('conversionUSD').hidden = true;
+  const btnComparar = document.getElementById('btnComparar');
+  if (btnComparar) btnComparar.textContent = '⇄ Steel Frame';
   window.scrollTo({ top: 0, behavior: 'smooth' });
 });
 
@@ -272,6 +293,7 @@ document.getElementById('overlay').addEventListener('click', cerrarPanel);
 
 function cerrarPanel() {
   document.getElementById('panelEstado').hidden = true;
+  document.getElementById('historialPanel').hidden = true;
   document.getElementById('overlay').hidden = true;
 }
 
@@ -559,8 +581,9 @@ function iniciarRotacionImagenes() {
     countdown.textContent = `↻ cambia en ${horas}h ${minutos}m`;
   }
 
+  if (window._arqCountdownInterval) clearInterval(window._arqCountdownInterval);
   actualizarCountdown();
-  setInterval(actualizarCountdown, 60 * 1000);
+  window._arqCountdownInterval = setInterval(actualizarCountdown, 60 * 1000);
 }
 
 // ===== Drawer de noticias (mobile) =====
@@ -616,7 +639,301 @@ function iniciarDrawerNoticias() {
   }, { passive: true });
 }
 
+// ===== Control de carga desde hash/historial (no guardar en historial) =====
+let cargandoDesdeHash = false;
+
+// ===== Modo oscuro =====
+function iniciarDarkMode() {
+  const btn = document.getElementById('btnDarkMode');
+  if (!btn) return;
+  if (localStorage.getItem('pob-tema') === 'dark') {
+    document.documentElement.setAttribute('data-theme', 'dark');
+    _actualizarIconoDarkMode(true);
+  }
+  btn.addEventListener('click', () => {
+    const oscuro = document.documentElement.getAttribute('data-theme') === 'dark';
+    if (oscuro) {
+      document.documentElement.removeAttribute('data-theme');
+      localStorage.setItem('pob-tema', 'light');
+      _actualizarIconoDarkMode(false);
+    } else {
+      document.documentElement.setAttribute('data-theme', 'dark');
+      localStorage.setItem('pob-tema', 'dark');
+      _actualizarIconoDarkMode(true);
+    }
+  });
+}
+
+function _actualizarIconoDarkMode(oscuro) {
+  const btn = document.getElementById('btnDarkMode');
+  if (!btn) return;
+  const icono = btn.querySelector('.btn-accion-icon');
+  const texto = btn.querySelector('.btn-accion-texto');
+  if (icono) icono.textContent = oscuro ? '☀' : '☾';
+  if (texto) texto.textContent = oscuro ? 'Claro' : 'Oscuro';
+}
+
+// ===== Imagen desde Unsplash API =====
+async function cargarImagenDesdeAPI() {
+  try {
+    const resp = await fetch('/api/imagen-arquitectura');
+    const data = await resp.json();
+    if (data.fallback || !Array.isArray(data) || data.length === 0) return;
+    IMAGENES_ARQ.length = 0;
+    data.forEach(f => IMAGENES_ARQ.push({ url: f.url, nombre: f.nombre, arquitecto: f.fotografo }));
+    iniciarRotacionImagenes();
+  } catch { /* usa imágenes hardcodeadas */ }
+}
+
+// ===== Noticias desde RSS API =====
+async function cargarNoticiasDesdeAPI() {
+  try {
+    const resp = await fetch('/api/noticias');
+    const data = await resp.json();
+    const items = Array.isArray(data) ? data : (data.items || []);
+    if (items.length === 0) return;
+
+    const colNoticias = document.getElementById('colNoticias');
+    colNoticias.querySelectorAll('.noticia').forEach(el => el.remove());
+
+    const TAGS = ['MERCADO', 'INDEC', 'TENDENCIA'];
+    items.forEach((item, i) => {
+      const art = document.createElement('article');
+      art.className = 'noticia';
+      if (item.link) {
+        art.style.cursor = 'pointer';
+        art.addEventListener('click', () => window.open(item.link, '_blank'));
+      }
+      art.innerHTML = `
+        ${item.imagen ? `<img class="noticia-thumb" src="${item.imagen}" alt="${item.titulo}" onerror="this.style.display='none'" />` : ''}
+        <div class="noticia-meta">
+          <span class="noticia-fecha">${item.fecha || ''}</span>
+          <span class="noticia-tag">${TAGS[i % TAGS.length]}</span>
+        </div>
+        <h3 class="noticia-titulo">${item.titulo}</h3>
+        ${item.fuente ? `<p class="noticia-texto">${item.fuente}</p>` : ''}
+      `;
+      colNoticias.appendChild(art);
+    });
+  } catch { /* usa noticias hardcodeadas */ }
+}
+
+// ===== Conversión USD =====
+async function cargarDolar() {
+  try {
+    const resp = await fetch('/api/dolar');
+    const data = await resp.json();
+    if (data.error || !resultadoActual) return;
+    const partes = [];
+    if (data.blue)    partes.push(`USD ${Math.round(resultadoActual.total / data.blue).toLocaleString('es-AR')} (blue)`);
+    if (data.oficial) partes.push(`USD ${Math.round(resultadoActual.total / data.oficial).toLocaleString('es-AR')} (oficial)`);
+    if (partes.length === 0) return;
+    const el = document.getElementById('conversionUSD');
+    if (el) { el.textContent = '≈ ' + partes.join(' / '); el.hidden = false; }
+  } catch { /* silencioso */ }
+}
+
+// ===== Comparativa Steel Frame =====
+async function toggleComparativa() {
+  const comparativa = document.getElementById('comparativa');
+  const btn = document.getElementById('btnComparar');
+  if (!comparativa.hidden) {
+    comparativa.hidden = true;
+    btn.textContent = '⇄ Steel Frame';
+    return;
+  }
+  const textoOrig = btn.textContent;
+  btn.textContent = 'Cargando...';
+  btn.disabled = true;
+  try {
+    const resp = await fetch('/api/precios-sf');
+    const datosSF = await resp.json();
+    const precioOrig = preciosActuales.precioM2Total;
+    preciosActuales.precioM2Total = datosSF.precioM2Total;
+    const resultSF = calcularPresupuesto(datosActuales);
+    preciosActuales.precioM2Total = precioOrig;
+    renderComparativa(resultadoActual, resultSF, datosSF);
+    comparativa.hidden = false;
+    btn.textContent = '✕ Cerrar comparativa';
+  } catch {
+    btn.textContent = textoOrig;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function renderComparativa(resTrad, resSF, datosSF) {
+  const diff = ((resSF.total - resTrad.total) / resTrad.total * 100);
+  const signo = diff >= 0 ? '+' : '';
+  document.getElementById('comparativaGrid').innerHTML = `
+    <div class="comp-col-header"></div>
+    <div class="comp-col-header">TRADICIONAL</div>
+    <div class="comp-col-header">STEEL FRAME${datosSF.esFallback ? ' *' : ''}</div>
+
+    <div class="comp-fila-label">Total estimado</div>
+    <div class="comp-fila-valor">${formatearPesos(resTrad.total)}</div>
+    <div class="comp-fila-valor comp-sf">${formatearPesos(resSF.total)}</div>
+
+    <div class="comp-fila-label">Precio m²</div>
+    <div class="comp-fila-valor">${formatearPesos(resTrad.precioM2Aplicado)}</div>
+    <div class="comp-fila-valor comp-sf">${formatearPesos(resSF.precioM2Aplicado)}</div>
+
+    <div class="comp-fila-label">Diferencia</div>
+    <div class="comp-fila-valor">—</div>
+    <div class="comp-fila-valor comp-sf">${signo}${diff.toFixed(1)}%</div>
+
+    <div class="comp-fila-label">Plazo aprox.</div>
+    <div class="comp-fila-valor">10–12 meses</div>
+    <div class="comp-fila-valor comp-sf">6–8 meses</div>
+
+    ${datosSF.esFallback ? '<div class="comp-nota">* Precio estimado — PDF IEC Steel Frame no disponible en CPI Córdoba</div>' : ''}
+  `;
+}
+
+// ===== Historial de consultas =====
+const HISTORIAL_KEY = 'pob-historial';
+const HISTORIAL_MAX = 10;
+
+function cargarHistorial() {
+  try { return JSON.parse(localStorage.getItem(HISTORIAL_KEY) || '[]'); } catch { return []; }
+}
+
+function guardarEnHistorial() {
+  if (!datosActuales || !resultadoActual) return;
+  const historial = cargarHistorial();
+  historial.unshift({
+    id: Date.now(),
+    fecha: new Date().toLocaleString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }),
+    nombreProyecto: datosActuales.nombreProyecto || '',
+    datos: { ...datosActuales },
+    total: resultadoActual.total,
+    mesReferencia: preciosActuales?.mesReferencia || '',
+  });
+  if (historial.length > HISTORIAL_MAX) historial.pop();
+  localStorage.setItem(HISTORIAL_KEY, JSON.stringify(historial));
+}
+
+function mostrarPanelHistorial() {
+  const historial = cargarHistorial();
+  const lista = document.getElementById('historialLista');
+  if (historial.length === 0) {
+    lista.innerHTML = '<p class="historial-vacio">No hay consultas guardadas aún.</p>';
+  } else {
+    lista.innerHTML = historial.map((e, i) => `
+      <div class="historial-item" data-index="${i}">
+        <div class="historial-item-header">
+          <span class="historial-nombre">${e.nombreProyecto || 'Sin nombre'}</span>
+          <button class="historial-eliminar" data-id="${e.id}" title="Eliminar">×</button>
+        </div>
+        <div class="historial-item-datos">${e.datos.metros}m² · ${ETIQUETAS.tipoObra[e.datos.tipoObra]} · ${ETIQUETAS.terminaciones[e.datos.terminaciones]}</div>
+        <div class="historial-item-total">${formatearPesos(e.total)}</div>
+        <div class="historial-item-fecha">${e.fecha}</div>
+      </div>
+    `).join('');
+
+    lista.querySelectorAll('.historial-item').forEach((el, i) => {
+      el.addEventListener('click', ev => {
+        if (!ev.target.classList.contains('historial-eliminar')) cargarDesdeHistorial(historial[i]);
+      });
+    });
+
+    lista.querySelectorAll('.historial-eliminar').forEach(btn => {
+      btn.addEventListener('click', ev => {
+        ev.stopPropagation();
+        const id = parseInt(btn.dataset.id);
+        const h = cargarHistorial().filter(e => e.id !== id);
+        localStorage.setItem(HISTORIAL_KEY, JSON.stringify(h));
+        mostrarPanelHistorial();
+      });
+    });
+  }
+  document.getElementById('historialPanel').hidden = false;
+  document.getElementById('overlay').hidden = false;
+}
+
+function cargarDesdeHistorial(entrada) {
+  const elNombreProyecto = document.getElementById('nombreProyecto');
+  if (elNombreProyecto) elNombreProyecto.value = entrada.nombreProyecto || '';
+  document.getElementById('metros').value = entrada.datos.metros;
+  document.getElementById('tipoObra').value = entrada.datos.tipoObra;
+  document.getElementById('plantas').value = entrada.datos.plantas;
+  document.getElementById('ambientes').value = entrada.datos.ambientes || '';
+  document.getElementById('banios').value = entrada.datos.banios;
+  document.getElementById('cocinas').value = entrada.datos.cocinas;
+  document.getElementById('terminaciones').value = entrada.datos.terminaciones;
+  cerrarPanel();
+  document.getElementById('seccionResultado').hidden = true;
+  document.getElementById('seccionFormulario').hidden = false;
+  cargandoDesdeHash = true;
+  document.getElementById('formulario').dispatchEvent(new Event('submit'));
+  cargandoDesdeHash = false;
+}
+
+// ===== Compartir URL (hash-based) =====
+function generarHashURL() {
+  if (!datosActuales) return window.location.href;
+  const d = datosActuales;
+  const p = new URLSearchParams({
+    m2:    d.metros,
+    tipo:  d.tipoObra,
+    plantas: d.plantas,
+    term:  d.terminaciones,
+    banios: d.banios,
+    cocinas: d.cocinas,
+  });
+  if (d.ambientes)      p.set('amb',    d.ambientes);
+  if (d.nombreProyecto) p.set('nombre', d.nombreProyecto);
+  return window.location.href.split('#')[0] + '#' + p.toString();
+}
+
+async function copiarURL() {
+  const url = generarHashURL();
+  const btn = document.getElementById('btnCompartir');
+  const textoOrig = btn.textContent;
+  try {
+    await navigator.clipboard.writeText(url);
+    btn.textContent = '✓ ¡COPIADO!';
+  } catch {
+    history.replaceState(null, '', url);
+    btn.textContent = '✓ URL actualizada';
+  }
+  setTimeout(() => { btn.textContent = textoOrig; }, 2500);
+}
+
+function cargarDesdeHash() {
+  if (!window.location.hash || window.location.hash.length < 5) return;
+  const p = new URLSearchParams(window.location.hash.substring(1));
+  if (!['m2', 'tipo', 'plantas', 'term', 'banios', 'cocinas'].every(c => p.get(c))) return;
+
+  document.getElementById('metros').value        = p.get('m2');
+  document.getElementById('tipoObra').value      = p.get('tipo');
+  document.getElementById('plantas').value       = p.get('plantas');
+  document.getElementById('terminaciones').value = p.get('term');
+  document.getElementById('banios').value        = p.get('banios');
+  document.getElementById('cocinas').value       = p.get('cocinas');
+  if (p.get('amb')) document.getElementById('ambientes').value = p.get('amb');
+  const elNombreProyecto = document.getElementById('nombreProyecto');
+  if (elNombreProyecto && p.get('nombre')) elNombreProyecto.value = p.get('nombre');
+
+  cargandoDesdeHash = true;
+  document.getElementById('formulario').dispatchEvent(new Event('submit'));
+  cargandoDesdeHash = false;
+}
+
+// ===== Event listeners para nuevos botones =====
+document.getElementById('btnHistorial').addEventListener('click', mostrarPanelHistorial);
+document.getElementById('btnCerrarHistorial').addEventListener('click', cerrarPanel);
+document.getElementById('btnLimpiarHistorial').addEventListener('click', () => {
+  localStorage.removeItem(HISTORIAL_KEY);
+  mostrarPanelHistorial();
+});
+document.getElementById('btnComparar').addEventListener('click', toggleComparativa);
+document.getElementById('btnCompartir').addEventListener('click', copiarURL);
+
 // ===== Inicialización =====
-cargarPrecios();
+cargarPrecios().then(cargarDesdeHash);
 iniciarRotacionImagenes();
 iniciarDrawerNoticias();
+iniciarDarkMode();
+cargarImagenDesdeAPI();
+cargarNoticiasDesdeAPI();

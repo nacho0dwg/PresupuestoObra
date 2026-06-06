@@ -21,12 +21,24 @@
       <span class="logo-subtitulo">CÓRDOBA · ARG</span>
     </div>
     <div class="header-meta">
-      <span class="meta-item" id="headerFuente">IEC — CPI Córdoba</span>
-      <span class="meta-sep">·</span>
-      <span class="meta-item" id="headerMes">—</span>
-      <span class="meta-sep">·</span>
-      <span class="meta-item" id="headerICC">—</span>
-      <button class="btn-info" id="btnInfo" title="Estado de datos">&#9432;</button>
+      <div class="header-info">
+        <span class="meta-item" id="headerFuente">IEC — CPI Córdoba</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item" id="headerMes">—</span>
+        <span class="meta-sep">·</span>
+        <span class="meta-item" id="headerICC">—</span>
+      </div>
+      <div class="header-acciones">
+        <button class="btn-accion" id="btnHistorial" title="Historial de consultas">
+          <span class="btn-accion-icon">☰</span>
+          <span class="btn-accion-texto">Historial</span>
+        </button>
+        <button class="btn-accion" id="btnDarkMode" title="Modo oscuro/claro">
+          <span class="btn-accion-icon">☾</span>
+          <span class="btn-accion-texto">Oscuro</span>
+        </button>
+        <button class="btn-info" id="btnInfo" title="Estado de datos">&#9432;</button>
+      </div>
     </div>
   </header>
 
@@ -67,6 +79,16 @@
   </div>
   <div class="overlay" id="overlay" hidden></div>
 
+  <!-- Historial de consultas (modal) -->
+  <div class="historial-panel" id="historialPanel" hidden>
+    <div class="panel-titulo">HISTORIAL DE CONSULTAS</div>
+    <div id="historialLista" class="historial-lista"></div>
+    <div class="historial-footer">
+      <button class="btn-secundario" id="btnLimpiarHistorial">Borrar todo</button>
+      <button class="btn-cerrar" id="btnCerrarHistorial">Cerrar</button>
+    </div>
+  </div>
+
   <!-- Layout 3 columnas -->
   <div class="page-layout">
 
@@ -93,6 +115,12 @@
         </div>
 
         <form id="formulario" novalidate>
+
+          <div class="campo campo-opcional">
+            <label for="nombreProyecto">NOMBRE DEL PROYECTO <span class="label-opcional">(opcional)</span></label>
+            <input type="text" id="nombreProyecto" name="nombreProyecto" maxlength="100"
+                   placeholder="ej: Casa Lomas de Caseros" />
+          </div>
 
           <div class="campo">
             <label for="metros">METROS CUADRADOS TOTALES *</label>
@@ -164,10 +192,13 @@
           <span class="seccion-titulo">RESULTADO ESTIMADO</span>
         </div>
 
+        <div class="resultado-nombre" id="resultadoNombre" hidden></div>
+
         <div class="total-grande">
           <span class="total-label">TOTAL ESTIMADO</span>
           <span class="total-valor" id="totalValor">—</span>
         </div>
+        <div class="conversion-usd" id="conversionUSD" hidden></div>
 
         <div class="precio-m2-info">
           <span id="infoFuente">—</span>
@@ -217,9 +248,19 @@
           presupuesto definitivo de obra.
         </p>
 
+        <div class="comparativa" id="comparativa" hidden>
+          <div class="seccion-header">
+            <span class="seccion-num">03</span>
+            <span class="seccion-titulo">COMPARATIVA STEEL FRAME</span>
+          </div>
+          <div class="comparativa-grid" id="comparativaGrid"></div>
+        </div>
+
         <div class="botones-resultado">
           <button class="btn-secundario" id="btnNuevaConsulta">Nueva consulta</button>
-          <button class="btn-pdf" id="btnExportarPDF">&#x2193; Exportar a PDF</button>
+          <button class="btn-pdf" id="btnExportarPDF">&#x2193; Exportar PDF</button>
+          <button class="btn-secundario" id="btnComparar">&#x21C4; Steel Frame</button>
+          <button class="btn-secundario" id="btnCompartir">&#x2197; Compartir</button>
         </div>
       </section>
 
