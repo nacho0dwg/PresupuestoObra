@@ -554,8 +554,8 @@ function generarPDF() {
 document.getElementById('btnExportarPDF').addEventListener('click', generarPDF);
 
 // ===== Rotación de imagen arquitectónica (cada 12 horas) =====
-function iniciarRotacionImagenes() {
-  const img      = document.getElementById('imagenArq');
+async function iniciarRotacionImagenes() {
+  const img       = document.getElementById('imagenArq');
   const capNombre = document.getElementById('captionNombre');
   const capArq    = document.getElementById('captionArq');
   const countdown = document.getElementById('imagenCountdown');
@@ -564,20 +564,47 @@ function iniciarRotacionImagenes() {
 
   const INTERVALO_MS = 12 * 60 * 60 * 1000;
   const periodo      = Math.floor(Date.now() / INTERVALO_MS);
-  const indice       = periodo % IMAGENES_ARQ.length;
-  const imagen       = IMAGENES_ARQ[indice];
+
+  let fotos = IMAGENES_ARQ;
+  try {
+    const resp = await fetch('/api/imagen-arquitectura');
+    const data = await resp.json();
+    if (Array.isArray(data) && data.length > 0) {
+      fotos = data.map(f => ({
+        url:       f.url,
+        nombre:    f.nombre,
+        arquitecto: f.fotografo,
+        perfilUrl: f.perfilUrl,
+      }));
+    }
+  } catch { /* usa imágenes hardcodeadas */ }
+
+  const indice = periodo % fotos.length;
+  const imagen = fotos[indice];
 
   img.src = imagen.url;
   if (capNombre) capNombre.textContent = imagen.nombre;
-  if (capArq)    capArq.textContent    = imagen.arquitecto;
+  if (capArq) {
+    capArq.textContent = '';
+    if (imagen.perfilUrl) {
+      const a = document.createElement('a');
+      a.href = imagen.perfilUrl;
+      a.target = '_blank';
+      a.rel = 'noopener';
+      a.textContent = imagen.arquitecto;
+      capArq.appendChild(a);
+    } else {
+      capArq.textContent = imagen.arquitecto;
+    }
+  }
 
   function actualizarCountdown() {
     if (!countdown) return;
-    const ahora      = Date.now();
+    const ahora         = Date.now();
     const proximoCambio = (periodo + 1) * INTERVALO_MS;
-    const restante   = proximoCambio - ahora;
-    const horas      = Math.floor(restante / (60 * 60 * 1000));
-    const minutos    = Math.floor((restante % (60 * 60 * 1000)) / (60 * 1000));
+    const restante      = proximoCambio - ahora;
+    const horas         = Math.floor(restante / (60 * 60 * 1000));
+    const minutos       = Math.floor((restante % (60 * 60 * 1000)) / (60 * 1000));
     countdown.textContent = `↻ cambia en ${horas}h ${minutos}m`;
   }
 
@@ -671,18 +698,6 @@ function _actualizarIconoDarkMode(oscuro) {
   const texto = btn.querySelector('.btn-accion-texto');
   if (icono) icono.textContent = oscuro ? '☀' : '☾';
   if (texto) texto.textContent = oscuro ? 'Claro' : 'Oscuro';
-}
-
-// ===== Imagen desde Unsplash API =====
-async function cargarImagenDesdeAPI() {
-  try {
-    const resp = await fetch('/api/imagen-arquitectura');
-    const data = await resp.json();
-    if (data.fallback || !Array.isArray(data) || data.length === 0) return;
-    IMAGENES_ARQ.length = 0;
-    data.forEach(f => IMAGENES_ARQ.push({ url: f.url, nombre: f.nombre, arquitecto: f.fotografo }));
-    iniciarRotacionImagenes();
-  } catch { /* usa imágenes hardcodeadas */ }
 }
 
 // ===== Noticias desde RSS API =====
@@ -935,5 +950,4 @@ cargarPrecios().then(cargarDesdeHash);
 iniciarRotacionImagenes();
 iniciarDrawerNoticias();
 iniciarDarkMode();
-cargarImagenDesdeAPI();
 cargarNoticiasDesdeAPI();
