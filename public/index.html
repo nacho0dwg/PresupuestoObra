@@ -74,6 +74,17 @@
       </div>
       <button class="btn-actualizar" id="btnActualizar">Verificar actualizaciones</button>
       <div id="estadoMensaje" class="estado-mensaje" hidden></div>
+
+      <div class="logo-estudio-seccion">
+        <span class="logo-estudio-label">LOGO DEL ESTUDIO (PDF)</span>
+        <img id="logoEstudioPreview" class="logo-estudio-preview" hidden />
+        <div>
+          <button type="button" class="btn-logo-accion" id="btnLogoCargar">Cargar imagen</button>
+          <button type="button" class="btn-logo-accion" id="btnLogoEliminar" hidden>Eliminar</button>
+        </div>
+        <input type="file" id="logoEstudioInput" accept="image/png,image/jpeg,image/webp" hidden />
+      </div>
+
       <button class="btn-cerrar" id="btnCerrarPanel">Cerrar</button>
     </div>
   </div>
@@ -124,6 +135,12 @@
 
           <div class="campo">
             <label for="metros">METROS CUADRADOS TOTALES *</label>
+            <div class="presets-rapidos" id="presetsRapidos">
+              <button type="button" class="btn-preset" data-m2="45"  data-amb="1" data-banios="1" data-cocinas="1">Monoambiente · 45m²</button>
+              <button type="button" class="btn-preset" data-m2="65"  data-amb="2" data-banios="1" data-cocinas="1">2 amb · 65m²</button>
+              <button type="button" class="btn-preset" data-m2="90"  data-amb="3" data-banios="2" data-cocinas="1">3 amb · 90m²</button>
+              <button type="button" class="btn-preset" data-m2="120" data-amb="4" data-banios="2" data-cocinas="1">4 amb · 120m²</button>
+            </div>
             <input type="number" id="metros" name="metros" min="1" max="9999"
                    placeholder="ej: 80" required />
           </div>
@@ -204,33 +221,35 @@
           <span id="infoFuente">—</span>
         </div>
 
-        <div class="desglose-titulo">DESGLOSE POR CATEGORÍA</div>
+        <div class="desglose-titulo">DESGLOSE POR CATEGORÍA
+          <button type="button" class="toggle-usd" id="toggleUSD">Ver en USD</button>
+        </div>
         <div class="desglose">
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Aportes al Colegio, derechos de edificación, cálculo estructural">
             <span>Trámites y gestiones previas</span>
             <span id="desgloseTramites">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Limpieza de terreno, obrador, replanteo, cerco de obra">
             <span>Trabajos preliminares</span>
             <span id="desglosePreliminares">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Fundaciones, hormigón armado, mampostería (materiales)">
             <span>Estructura y obra gruesa (materiales)</span>
             <span id="desgloseObraGruesa">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Mano de obra de todos los rubros sin cargas sociales">
             <span>Mano de obra total</span>
             <span id="desgloseManoDeObra">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Sanitaria, eléctrica y gas completos con artefactos">
             <span>Instalaciones (sanitaria, eléctrica, gas)</span>
             <span id="desgloseInstalaciones">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Pisos, revoques, pinturas, aberturas, carpintería">
             <span>Terminaciones</span>
             <span id="desgloseTerminaciones">—</span>
           </div>
-          <div class="desglose-fila">
+          <div class="desglose-fila" data-tooltip="Proyecto + conducción técnica. Se acuerda con el comitente">
             <span>Honorarios profesionales</span>
             <span id="desgloseHonorarios">—</span>
           </div>
@@ -256,9 +275,15 @@
           <div class="comparativa-grid" id="comparativaGrid"></div>
         </div>
 
+        <div class="campo-observaciones">
+          <label for="observaciones">OBSERVACIONES <span class="label-opcional">(opcional)</span></label>
+          <textarea id="observaciones" name="observaciones" placeholder="Notas adicionales para incluir en el PDF..."></textarea>
+        </div>
+
         <div class="botones-resultado">
           <button class="btn-secundario" id="btnNuevaConsulta">Nueva consulta</button>
           <button class="btn-pdf" id="btnExportarPDF">&#x2193; Exportar PDF</button>
+          <button class="btn-secundario" id="btnImprimir">&#x2399; Imprimir</button>
           <button class="btn-secundario" id="btnComparar">&#x21C4; Steel Frame</button>
           <button class="btn-secundario" id="btnCompartir">&#x2197; Compartir</button>
         </div>

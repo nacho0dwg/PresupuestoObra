@@ -191,6 +191,8 @@ body {
   line-height: 1.4;
 }
 
+.caption-arq a { color: inherit; text-decoration: underline; }
+
 .imagen-countdown {
   padding: 0.35rem 1rem 0.75rem;
   font-family: var(--font-mono);
@@ -303,6 +305,34 @@ body {
   border-bottom: 0.5px solid var(--rojo);
 }
 
+/* ===== Presets rápidos de m² ===== */
+.presets-rapidos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.75rem;
+}
+
+.btn-preset {
+  background: transparent;
+  border: 0.5px solid var(--borde-medio);
+  color: var(--texto-suave);
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  letter-spacing: 0.04em;
+  padding: 0.28rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+}
+
+.btn-preset:hover { border-color: var(--negro); color: var(--negro); }
+
+.btn-preset.activo {
+  background: var(--negro);
+  color: var(--crema);
+  border-color: var(--negro);
+}
+
 .btn-calcular {
   width: 100%;
   background: var(--negro);
@@ -374,6 +404,60 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* ===== Toggle Ver en USD ===== */
+.toggle-usd {
+  background: transparent;
+  border: 0.5px solid var(--borde-medio);
+  color: var(--texto-suave);
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  letter-spacing: 0.06em;
+  padding: 0.25rem 0.55rem;
+  cursor: pointer;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
+  float: right;
+  margin-top: -0.1rem;
+}
+
+.toggle-usd.activo {
+  background: var(--negro);
+  color: var(--crema);
+  border-color: var(--negro);
+}
+
+/* ===== Observaciones ===== */
+.campo-observaciones {
+  margin-top: 1.25rem;
+  margin-bottom: 1.25rem;
+}
+
+.campo-observaciones label {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: var(--texto-suave);
+  letter-spacing: 0.14em;
+  margin-bottom: 0.45rem;
+}
+
+.campo-observaciones textarea {
+  width: 100%;
+  padding: 0.5rem 0;
+  border: none;
+  border-bottom: 0.5px solid var(--borde-medio);
+  background: transparent;
+  font-family: var(--font-sans);
+  font-size: 0.88rem;
+  color: var(--negro);
+  outline: none;
+  resize: vertical;
+  min-height: 56px;
+  transition: border-color 0.15s;
+}
+
+.campo-observaciones textarea:focus { border-bottom-color: var(--negro); }
+
 .desglose-fila {
   display: flex;
   justify-content: space-between;
@@ -381,6 +465,7 @@ body {
   padding: 0.7rem 0;
   border-bottom: 0.5px solid var(--borde);
   gap: 1rem;
+  position: relative;
 }
 
 .desglose-fila span:first-child {
@@ -396,6 +481,29 @@ body {
   flex-shrink: 0;
   color: var(--negro);
 }
+
+/* ===== Tooltips en desglose ===== */
+.desglose-fila[data-tooltip]::after {
+  content: attr(data-tooltip);
+  position: absolute;
+  bottom: calc(100% + 5px);
+  left: 0;
+  background: var(--negro);
+  color: var(--crema);
+  font-family: var(--font-mono);
+  font-size: 0.54rem;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+  padding: 0.4rem 0.65rem;
+  white-space: normal;
+  max-width: 280px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+  z-index: 10;
+}
+
+.desglose-fila[data-tooltip]:hover::after { opacity: 1; }
 
 .desglose-nota {
   font-family: var(--font-mono);
@@ -475,6 +583,46 @@ body {
 }
 
 .btn-pdf:hover { opacity: 0.82; }
+
+/* ===== Logo del estudio (panel) ===== */
+.logo-estudio-seccion {
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 0.5px dashed var(--borde-medio);
+}
+
+.logo-estudio-label {
+  font-family: var(--font-mono);
+  font-size: 0.57rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: var(--texto-suave);
+  margin-bottom: 0.5rem;
+  display: block;
+}
+
+.logo-estudio-preview {
+  display: block;
+  max-height: 48px;
+  max-width: 130px;
+  margin: 0.4rem 0;
+  object-fit: contain;
+}
+
+.btn-logo-accion {
+  background: transparent;
+  border: 0.5px solid var(--borde-medio);
+  color: var(--texto-suave);
+  font-family: var(--font-mono);
+  font-size: 0.6rem;
+  letter-spacing: 0.06em;
+  padding: 0.28rem 0.6rem;
+  cursor: pointer;
+  margin-right: 0.4rem;
+  transition: border-color 0.15s, color 0.15s;
+}
+
+.btn-logo-accion:hover { border-color: var(--negro); color: var(--negro); }
 
 /* ===== Panel de estado (modal) ===== */
 .overlay {
@@ -1123,4 +1271,43 @@ html { transition: background-color 0.3s ease; }
 [data-theme="dark"] option {
   background: #1c1c1a;
   color: #F0EFEB;
+}
+
+[data-theme="dark"] .campo-observaciones textarea {
+  color: var(--negro);
+}
+
+/* ===== Impresión ===== */
+@media print {
+  .col-imagen,
+  .col-noticias,
+  .site-header,
+  .site-footer,
+  .botones-resultado,
+  .campo-observaciones,
+  .comparativa,
+  .bg-grid,
+  .btn-drawer-mobile,
+  .drawer-overlay,
+  .panel-estado,
+  .historial-panel,
+  .overlay { display: none !important; }
+
+  body { height: auto; overflow: visible; background: #fff; }
+
+  .page-layout {
+    display: block;
+    overflow: visible;
+  }
+
+  .col-central {
+    padding: 1rem 2rem;
+    max-width: 100%;
+    overflow: visible;
+  }
+
+  #seccionFormulario { display: none !important; }
+  #seccionResultado { display: block !important; }
+
+  .total-valor { font-size: 2rem; }
 }
