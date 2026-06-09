@@ -5,6 +5,12 @@
   padding: 0;
 }
 
+/* ===== Scrollbar minimal ===== */
+::-webkit-scrollbar { width: 3px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); }
+[data-theme="dark"] ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+
 [hidden] { display: none !important; }
 
 /* ===== Variables ===== */
@@ -82,6 +88,7 @@ body {
   font-size: 1.05rem;
   letter-spacing: 0.06em;
   color: var(--negro);
+  text-decoration: none;
 }
 
 .logo-subtitulo {
