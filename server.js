@@ -95,6 +95,7 @@ app.get('/api/imagen-arquitectura', async (req, res) => {
   if (cache.imagen.data && ahora - cache.imagen.ts < TTL.imagen) return res.json(cache.imagen.data);
 
   const key = process.env.UNSPLASH_ACCESS_KEY;
+  console.log('[Unsplash] Key presente:', !!key, '| Longitud:', key ? key.length : 0);
   if (!key) return res.json({ fallback: true });
 
   try {
@@ -112,7 +113,9 @@ app.get('/api/imagen-arquitectura', async (req, res) => {
     cache.imagen = { data: fotos, ts: ahora };
     res.json(fotos);
   } catch (err) {
-    console.warn('[Unsplash] Error:', err.message);
+    console.warn('[Unsplash] Error mensaje:', err.message);
+    console.warn('[Unsplash] HTTP status:', err.response?.status);
+    console.warn('[Unsplash] Respuesta body:', JSON.stringify(err.response?.data));
     res.json({ fallback: true });
   }
 });
