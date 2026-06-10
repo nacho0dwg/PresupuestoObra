@@ -388,8 +388,8 @@ async function generarPDF() {
   const BG   = [247, 246, 242];
   const BLK  = [26, 26, 26];
   const RED  = [192, 57, 43];
-  const BLKF = [240, 238, 233]; // fondo de bloque (ligeramente más oscuro que BG)
-  const WM   = [227, 226, 223]; // opacidad 0.08 — marca de agua
+  const BLKF = [246, 244, 240]; // fondo de bloque a 0.20 de opacidad sobre BG
+  const WM   = [232, 231, 228]; // opacidad 0.06 — marca de agua
   const BRD  = [217, 216, 213]; // opacidad 0.12 — borde de bloque
   const DIV  = [198, 197, 194]; // opacidad 0.20 — líneas divisorias
   const G28  = [178, 177, 174]; // opacidad 0.28 — escala de meses
@@ -448,7 +448,7 @@ async function generarPDF() {
   // ── 4. Marca de agua — grilla de cruces ───────────────────────────────────
   doc.setDrawColor(...WM);
   doc.setLineWidth(0.2);
-  const WS = 8, WA = 1.5;
+  const WS = 8, WA = 0.7;
   for (let px = 0; px <= 210; px += WS)
     for (let py = 0; py <= 297; py += WS) {
       doc.line(px, py - WA, px, py + WA);
@@ -755,7 +755,11 @@ async function generarPDF() {
 
   // ── 10. Bloque observaciones + firma ──────────────────────────────────────
   y += GAP;
-  const OBS_H = 35;
+
+  // Footer ocupa: 2mm gap + 1mm divider + 4mm gap + ~4mm footer text + 1mm buffer
+  const FOOTER_RES = 12;
+  const OBS_H = Math.max(35, (297 - M) - y - FOOTER_RES);
+
   blkRect(M, y, W, OBS_H);
 
   doc.setFont('courier', 'normal');
@@ -777,9 +781,9 @@ async function generarPDF() {
     doc.text('Sin observaciones adicionales.', M + P, y + P + SEC_H + 2);
   }
 
-  // Firma (mitad inferior, alineada a la derecha)
+  // Firma en la mitad inferior del bloque (línea al 60% de la altura)
   const sigX = M + W - P - 55;
-  const sigY = y + OBS_H - P - 10;
+  const sigY = y + OBS_H * 0.60;
   doc.setDrawColor(...G30);
   doc.setLineWidth(0.3);
   doc.line(sigX, sigY, M + W - P, sigY);

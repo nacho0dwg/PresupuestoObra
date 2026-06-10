@@ -399,6 +399,12 @@ body {
   margin-bottom: 0;
 }
 
+.desglose-titulo-acciones {
+  text-align: right;
+  margin-top: 0.45rem;
+  margin-bottom: 0.55rem;
+}
+
 .desglose {
   border-top: 0.5px solid var(--borde-medio);
   margin-bottom: 1.5rem;
@@ -415,8 +421,6 @@ body {
   padding: 0.25rem 0.55rem;
   cursor: pointer;
   transition: border-color 0.15s, color 0.15s, background 0.15s;
-  float: right;
-  margin-top: -0.1rem;
 }
 
 .toggle-usd.activo {
@@ -486,21 +490,23 @@ body {
 .desglose-fila[data-tooltip]::after {
   content: attr(data-tooltip);
   position: absolute;
-  bottom: calc(100% + 5px);
-  left: 0;
-  background: var(--negro);
-  color: var(--crema);
+  top: -2px;
+  right: 0;
+  background: rgba(26, 26, 26, 0.95);
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  border-radius: 0;
+  color: rgba(255, 255, 255, 0.85);
   font-family: var(--font-mono);
-  font-size: 0.54rem;
+  font-size: 10px;
   letter-spacing: 0.02em;
   line-height: 1.5;
-  padding: 0.4rem 0.65rem;
+  padding: 6px 8px;
   white-space: normal;
   max-width: 280px;
   pointer-events: none;
   opacity: 0;
   transition: opacity 0.15s;
-  z-index: 10;
+  z-index: 100;
 }
 
 .desglose-fila[data-tooltip]:hover::after { opacity: 1; }
