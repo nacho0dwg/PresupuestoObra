@@ -350,299 +350,475 @@ const ETIQUETAS = {
   },
 };
 
-// ===== Exportar a PDF — rediseño completo =====
-function generarPDF() {
+// ===== Exportar a PDF — layout rediseñado =====
+async function generarPDF() {
   if (!datosActuales || !resultadoActual) return;
 
   const { jsPDF } = window.jspdf;
+
+  // ── 1. Logo: cargar dimensiones reales antes de crear el doc ─────────────
+  const logoB64 = localStorage.getItem(LOGO_KEY);
+  let logoInfo  = null;
+
+  if (logoB64) {
+    logoInfo = await new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX_W = 28, MAX_H = 14;
+        const ratio = img.naturalWidth / img.naturalHeight;
+        let w, h;
+        if (ratio > 2)        { w = MAX_W; h = MAX_W / ratio; }
+        else if (ratio < 0.5) { h = MAX_H; w = MAX_H * ratio; }
+        else if (MAX_W / ratio <= MAX_H) { w = MAX_W; h = MAX_W / ratio; }
+        else                  { h = MAX_H; w = MAX_H * ratio; }
+        const fmt = logoB64.includes('data:image/png') ? 'PNG' : 'JPEG';
+        resolve({ data: logoB64, fmt, w, h });
+      };
+      img.onerror = () => resolve(null);
+      img.src = logoB64;
+    });
+  }
+
+  // ── 2. Constantes ─────────────────────────────────────────────────────────
   const doc = new jsPDF({ unit: 'mm', format: 'a4' });
+  const M = 18;
+  const W = 174; // 210 - 2×18
 
-  const M     = 18;
-  const ANCHO = 210 - M * 2;
+  // Colores pre-mezclados sobre BG [247,246,242] para simular opacidades
+  const BG   = [247, 246, 242];
+  const BLK  = [26, 26, 26];
+  const RED  = [192, 57, 43];
+  const BLKF = [240, 238, 233]; // fondo de bloque (ligeramente más oscuro que BG)
+  const WM   = [227, 226, 223]; // opacidad 0.08 — marca de agua
+  const BRD  = [217, 216, 213]; // opacidad 0.12 — borde de bloque
+  const DIV  = [198, 197, 194]; // opacidad 0.20 — líneas divisorias
+  const G28  = [178, 177, 174]; // opacidad 0.28 — escala de meses
+  const G30  = [173, 172, 169]; // opacidad 0.30 — línea firma, nota italic
+  const G38  = [153, 152, 150]; // opacidad 0.38 — labels de sección, fecha
+  const G40  = [148, 148, 145]; // opacidad 0.40 — subtítulo, footer
+  const G45  = [136, 135, 133]; // opacidad 0.45 — labels de fila
+  const G55  = [111, 111, 109]; // opacidad 0.55 — texto observaciones
+  const G60  = [99, 98, 97];    // opacidad 0.60 — labels desglose
+  const SEP  = [230, 229, 225]; // opacidad 0.07 — separadores de fila
 
-  const FONDO = [247, 246, 242];
-  const NEGRO = [26, 26, 26];
-  const ROJO  = [192, 57, 43];
-  const GRIS  = [150, 146, 138];
-  const BORDE = [210, 207, 200];
+  // Geometría
+  const P   = 4;  // padding interno de bloque
+  const GAP = 3;  // separación entre bloques
 
-  const fechaHoy = new Date().toLocaleDateString('es-AR', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  });
+  // Columnas sección central
+  const CL_W = 58;
+  const CL_X = M;
+  const CR_X = M + CL_W + 2;
+  const CR_W = W - CL_W - 2; // 114mm
 
-  // Fondo crema
-  doc.setFillColor(...FONDO);
+  // Alturas bloque parámetros
+  const SEC_H  = 5;   // label de sección + gap
+  const PROW_H = 8.5; // altura por fila de parámetro
+  const PARAMS_H = P + SEC_H + 7 * PROW_H + P; // 4+5+59.5+4 = 72.5mm
+
+  // Gantt (debe tener exactamente PARAMS_H)
+  const GM_H  = 5;   // escala de meses
+  const GL_H  = 5;   // leyenda
+  const GN_H  = 4;   // nota
+  const GN    = 5;   // filas de etapa
+  const GROW_H = (PARAMS_H - P - SEC_H - GM_H - GL_H - GN_H - P) / GN; // 9.1mm
+
+  // Barra gantt: columna de label 24mm + área de barra
+  const GLBL_W = 24;
+  const GBAR_X = CR_X + P + GLBL_W + 1;
+  const GBAR_W = CR_W - P - GLBL_W - 1 - P; // 81mm
+
+  // Fecha
+  const MESES_ES = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  const hoy       = new Date();
+  const fechaTxt  = `Generado el ${hoy.getDate()} de ${MESES_ES[hoy.getMonth()]} de ${hoy.getFullYear()}`;
+
+  // Helper: rect de bloque con borde
+  const blkRect = (bx, by, bw, bh) => {
+    doc.setFillColor(...BLKF);
+    doc.setDrawColor(...BRD);
+    doc.setLineWidth(0.3);
+    doc.rect(bx, by, bw, bh, 'FD');
+  };
+
+  // ── 3. Fondo ──────────────────────────────────────────────────────────────
+  doc.setFillColor(...BG);
   doc.rect(0, 0, 210, 297, 'F');
 
-  // Grilla de cruces (marca de agua)
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.15);
-  const PASO = 10; const TAM = 1.6;
-  for (let px = 5; px < 210; px += PASO)
-    for (let py = 5; py < 297; py += PASO) {
-      doc.line(px, py - TAM, px, py + TAM);
-      doc.line(px - TAM, py, px + TAM, py);
+  // ── 4. Marca de agua — grilla de cruces ───────────────────────────────────
+  doc.setDrawColor(...WM);
+  doc.setLineWidth(0.2);
+  const WS = 8, WA = 1.5;
+  for (let px = 0; px <= 210; px += WS)
+    for (let py = 0; py <= 297; py += WS) {
+      doc.line(px, py - WA, px, py + WA);
+      doc.line(px - WA, py, px + WA, py);
     }
 
-  // ── HEADER ──────────────────────────────────────────────────────────────────
+  // ── 5. Header ─────────────────────────────────────────────────────────────
+  const HY = M; // y = 18
+
   doc.setFont('courier', 'bold');
-  doc.setFontSize(12);
-  doc.setTextColor(...NEGRO);
-  doc.text('PRESUPUESTO\xB7OBRA', M, 15);
+  doc.setFontSize(13);
+  doc.setTextColor(...BLK);
+  doc.text('PRESUPUESTO\xB7OBRA', M, HY + 5);
 
   doc.setFont('courier', 'normal');
   doc.setFontSize(6);
-  doc.setTextColor(...GRIS);
-  doc.text('C\xD3RDOBA \xB7 ARG', M, 20.5);
+  doc.setTextColor(...G40);
+  doc.text('C\xD3RDOBA \xB7 ARG', M, HY + 9.5);
 
-  // Logo del estudio (si existe)
-  const logoB64 = localStorage.getItem(LOGO_KEY);
-  if (logoB64) {
-    try { doc.addImage(logoB64, 210 - M - 35, 10, 35, 12, '', 'FAST'); } catch { /* sin logo */ }
-  }
-
-  doc.setFont('courier', 'normal');
   doc.setFontSize(6);
-  doc.setTextColor(...GRIS);
-  doc.text(`Generado el ${fechaHoy}`, 210 - M, logoB64 ? 26 : 20.5, { align: 'right' });
+  doc.setTextColor(...G38);
+  doc.text(fechaTxt, M, HY + 13.5);
 
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
-  doc.line(M, 27, 210 - M, 27);
-
-  let y = 36;
-
-  // Nombre del proyecto
-  const nombreProyecto = datosActuales.nombreProyecto;
-  if (nombreProyecto) {
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(16);
-    doc.setTextColor(...NEGRO);
-    doc.text(nombreProyecto.toUpperCase(), M, y);
-    y += 7;
+  // Logo (derecha del header)
+  const LBX = 210 - M - 28; // logo box x
+  const LBY = HY;           // logo box y
+  if (logoInfo) {
+    const lx = 210 - M - logoInfo.w;
+    const ly = HY + (14 - logoInfo.h) / 2;
+    try { doc.addImage(logoInfo.data, logoInfo.fmt, lx, ly, logoInfo.w, logoInfo.h); } catch { /* skip */ }
+  } else {
+    doc.setDrawColor(...DIV);
+    doc.setLineWidth(0.3);
+    doc.rect(LBX, LBY, 28, 14);
     doc.setFont('courier', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...GRIS);
-    doc.text('PROYECTO \xB7 C\xD3RDOBA, ARGENTINA', M, y);
-    y += 10;
+    doc.setFontSize(6);
+    doc.setTextColor(...G38);
+    doc.text('LOGO', LBX + 14, LBY + 8, { align: 'center' });
   }
 
-  // ── BLOQUE 01 PARÁMETROS ─────────────────────────────────────────────────
-  // Fondo del bloque
-  doc.setFillColor(240, 238, 233);
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
+  // Línea divisoria header
+  const DIV1Y = HY + 18;
+  doc.setDrawColor(...DIV);
+  doc.setLineWidth(0.3);
+  doc.line(M, DIV1Y, 210 - M, DIV1Y);
 
-  const d = datosActuales;
+  // ── 6. Nombre del proyecto ────────────────────────────────────────────────
+  let y = DIV1Y + 5;
+
+  const nomProyecto = (datosActuales.nombreProyecto?.toUpperCase()) || 'PRESUPUESTO DE OBRA';
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(18);
+  doc.setTextColor(...BLK);
+  doc.text(nomProyecto, M, y + 7);
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G40);
+  doc.text('PROYECTO \xB7 C\xD3RDOBA, ARGENTINA', M, y + 13);
+
+  y += 17; // nombre (13mm) + gap 4mm
+
+  // ── 7. Sección central — dos columnas ─────────────────────────────────────
+  const d  = datosActuales;
+  const r  = resultadoActual;
+  const CY = y; // top de la sección central
+
+  // ── Columna izquierda: PARÁMETROS ─────────────────────────────────────────
+  blkRect(CL_X, CY, CL_W, PARAMS_H);
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('01 — PAR\xC1METROS', CL_X + P, CY + P + 2.5);
+
   const params = [
     ['SUPERFICIE',    `${d.metros} m\xB2`],
     ['TIPO DE OBRA',  ETIQUETAS.tipoObra[d.tipoObra]],
     ['PLANTAS',       ETIQUETAS.plantas[d.plantas]],
-    ['AMBIENTES',     d.ambientes ? String(d.ambientes) : 'No especificado'],
+    ['AMBIENTES',     d.ambientes ? String(d.ambientes) : '—'],
     ['BA\xD1OS',      String(d.banios)],
     ['COCINAS',       String(d.cocinas)],
     ['TERMINACIONES', ETIQUETAS.terminaciones[d.terminaciones]],
   ];
 
-  const COL2 = M + ANCHO / 2;
-  const filaH = 7;
-  const bloqueH = 8 + Math.ceil(params.length / 2) * filaH;
+  let pY = CY + P + SEC_H;
+  for (const [label, valor] of params) {
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(...G45);
+    doc.text(label, CL_X + P, pY + 2);
 
-  doc.rect(M, y, ANCHO, bloqueH, 'FD');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    doc.setTextColor(...BLK);
+    doc.text(valor, CL_X + P, pY + 6.5);
+
+    doc.setDrawColor(...SEP);
+    doc.setLineWidth(0.2);
+    doc.line(CL_X + P, pY + PROW_H - 0.5, CL_X + CL_W - P, pY + PROW_H - 0.5);
+
+    pY += PROW_H;
+  }
+
+  // ── Columna derecha: GANTT ────────────────────────────────────────────────
+  blkRect(CR_X, CY, CR_W, PARAMS_H);
 
   doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('01 \xB7 PAR\xC1METROS', M + 3, y + 5);
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('PLAN DE OBRA \xB7 10 MESES', CR_X + P, CY + P + 2.5);
 
-  let yr = y + 10;
-  params.forEach(([label, valor], i) => {
-    const col = i % 2 === 0 ? M + 3 : COL2 + 3;
-    if (i % 2 === 0 && i > 0) yr += filaH;
+  // Escala M1–M10
+  const MSY = CY + P + SEC_H + 3.5;
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(5);
+  doc.setTextColor(...G28);
+  for (let i = 1; i <= 10; i++) {
+    const mx = GBAR_X + ((i - 1) / 9) * GBAR_W;
+    const align = i === 1 ? 'left' : i === 10 ? 'right' : 'center';
+    doc.text(`M${i}`, mx, MSY, { align });
+  }
+
+  // Filas de etapa
+  const etapas = [
+    { label: 'TR\xC1MITES',   pct: '25%', s: 0.00, e: 0.20 },
+    { label: 'FUNDACIONES',   pct: '30%', s: 0.10, e: 0.30 },
+    { label: 'ESTRUCTURA',    pct: '20%', s: 0.20, e: 0.60 },
+    { label: 'INSTALACIONES', pct: '15%', s: 0.40, e: 0.70 },
+    { label: 'TERMINACIONES', pct: '10%', s: 0.60, e: 1.00 },
+  ];
+
+  let gY = CY + P + SEC_H + GM_H;
+  const BAR_H = 2.5;
+
+  for (const et of etapas) {
+    const barY  = gY + GROW_H * 0.42;
+    const barCY = barY + BAR_H / 2;
+
+    // Fondo barra gris
+    doc.setFillColor(...SEP);
+    doc.rect(GBAR_X, barY, GBAR_W, BAR_H, 'F');
+
+    // Barra negra (duración de etapa)
+    doc.setFillColor(...BLK);
+    doc.rect(GBAR_X + et.s * GBAR_W, barY, (et.e - et.s) * GBAR_W, BAR_H, 'F');
+
+    // Marcador de desembolso (centrado en inicio de etapa)
+    const mW = 1.8, mH = 4;
+    const mX = GBAR_X + et.s * GBAR_W - mW / 2;
+    const mY = barCY - mH / 2;
+    doc.setFillColor(...RED);
+    doc.rect(mX, mY, mW, mH, 'F');
+
+    // Porcentaje en rojo encima del marcador
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(5.5);
+    doc.setTextColor(...RED);
+    doc.text(et.pct, mX + mW / 2, mY - 0.8, { align: 'center' });
+
+    // Label de etapa alineado verticalmente con la barra
     doc.setFont('courier', 'normal');
     doc.setFontSize(5.5);
-    doc.setTextColor(...GRIS);
-    doc.text(label, col, yr);
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(7.5);
-    doc.setTextColor(...NEGRO);
-    doc.text(valor, col, yr + 4);
-  });
+    doc.setTextColor(...BLK);
+    doc.text(et.label, CR_X + P, barCY + 1.5);
 
-  y += bloqueH + 6;
-
-  // ── BLOQUE 02 TOTAL ───────────────────────────────────────────────────────
-  doc.setFillColor(240, 238, 233);
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
-  doc.rect(M, y, ANCHO, 28, 'FD');
-
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('02 \xB7 TOTAL ESTIMADO', M + 3, y + 5);
-
-  doc.setFont('courier', 'bold');
-  doc.setFontSize(24);
-  doc.setTextColor(...ROJO);
-  doc.text(formatearPesos(resultadoActual.total), M + 3, y + 18);
-
-  // USD si hay cotización
-  if (dolarCache?.blue) {
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(7);
-    doc.setTextColor(...GRIS);
-    const usd = Math.round(resultadoActual.total / dolarCache.blue);
-    doc.text(`≈ U$D ${usd.toLocaleString('es-AR')} (blue $${dolarCache.blue.toLocaleString('es-AR')})`, M + 3, y + 25);
+    gY += GROW_H;
   }
 
-  y += 34;
-
-  // ── BLOQUE 03 DESGLOSE ────────────────────────────────────────────────────
+  // Leyenda
+  const legY = CY + P + SEC_H + GM_H + GN * GROW_H + 1;
+  doc.setFillColor(...BLK);
+  doc.rect(CR_X + P, legY, 3, 1, 'F');
   doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('03 \xB7 DESGLOSE POR CATEGOR\xCDA', M, y);
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
-  doc.line(M, y + 2.5, 210 - M, y + 2.5);
-  y += 8;
+  doc.setFontSize(5);
+  doc.setTextColor(...BLK);
+  doc.text('Etapa', CR_X + P + 4, legY + 1);
+
+  doc.setFillColor(...RED);
+  doc.rect(CR_X + P + 17, legY - 0.5, 2, 2, 'F');
+  doc.setTextColor(...G40);
+  doc.text('Desembolso estimado \xB7 referenciales', CR_X + P + 20.5, legY + 1);
+
+  // Nota italic
+  doc.setFont('courier', 'italic');
+  doc.setFontSize(5);
+  doc.setTextColor(...G30);
+  doc.text('Porcentajes referenciales, se acuerdan con el comitente', CR_X + P, legY + GL_H - 0.5);
+
+  y = CY + PARAMS_H;
+
+  // ── 8. Bloque total ───────────────────────────────────────────────────────
+  y += GAP;
+  const TOT_H = 28;
+  blkRect(M, y, W, TOT_H);
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('02 — TOTAL ESTIMADO', M + P, y + P + 2.5);
+
+  // Izquierda: label + monto grande
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G45);
+  doc.text('TOTAL ESTIMADO', M + P, y + P + 7);
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(20);
+  doc.setTextColor(...RED);
+  doc.text(formatearPesos(r.total), M + P, y + P + 16);
+
+  if (dolarCache?.blue) {
+    const usdBlue = Math.round(r.total / dolarCache.blue);
+    let usdTxt = `≈ USD ${usdBlue.toLocaleString('es-AR')} (blue)`;
+    if (dolarCache.oficial) {
+      usdTxt += ` / USD ${Math.round(r.total / dolarCache.oficial).toLocaleString('es-AR')} (oficial)`;
+    }
+    doc.setFont('courier', 'normal');
+    doc.setFontSize(6);
+    doc.setTextColor(...G45);
+    doc.text(usdTxt, M + P, y + P + 21);
+  }
+
+  // Derecha: precio m² aplicado
+  const mesRef   = preciosActuales?.mesReferencia || '';
+  const baseLbl  = mesRef ? `Base ${mesRef} \xB7 actualizado con ICC` : 'Actualizado con ICC';
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('PRECIO M\xB2 APLICADO', M + W - P, y + P + 7, { align: 'right' });
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(14);
+  doc.setTextColor(...BLK);
+  doc.text(formatearPesos(r.precioM2Aplicado), M + W - P, y + P + 16, { align: 'right' });
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text(baseLbl, M + W - P, y + P + 21, { align: 'right' });
+
+  y += TOT_H;
+
+  // ── 9. Bloque desglose ────────────────────────────────────────────────────
+  y += GAP;
+  const CROW_H = 5;
+  const DESG_H = P + SEC_H + 7 * CROW_H + 2 + 8 + P;
+  blkRect(M, y, W, DESG_H);
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('03 — DESGLOSE POR CATEGOR\xCDA', M + P, y + P + 2.5);
 
   const categorias = [
-    ['Tramites y gestiones previas',              resultadoActual.desglose.tramites],
-    ['Trabajos preliminares',                     resultadoActual.desglose.preliminares],
-    ['Estructura y obra gruesa (materiales)',      resultadoActual.desglose.obraGruesa],
-    ['Mano de obra total',                        resultadoActual.desglose.manoDeObra],
-    ['Instalaciones (sanitaria, electrica, gas)', resultadoActual.desglose.instalaciones],
-    ['Terminaciones',                             resultadoActual.desglose.terminaciones],
-    ['Honorarios profesionales',                  resultadoActual.desglose.honorarios],
+    ['Trámites y gestiones previas',              r.desglose.tramites],
+    ['Trabajos preliminares',                     r.desglose.preliminares],
+    ['Estructura y obra gruesa',                  r.desglose.obraGruesa],
+    ['Mano de obra total',                        r.desglose.manoDeObra],
+    ['Instalaciones (sanitaria, eléctrica, gas)', r.desglose.instalaciones],
+    ['Terminaciones',                             r.desglose.terminaciones],
+    ['Honorarios profesionales',                  r.desglose.honorarios],
   ];
 
+  let cY = y + P + SEC_H;
   for (const [label, monto] of categorias) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...G60);
+    doc.text(label, M + P, cY + 3.5);
+
     doc.setFont('courier', 'normal');
-    doc.setFontSize(8.5);
-    doc.setTextColor(...NEGRO);
-    doc.text(label, M, y);
-    doc.setFont('courier', 'bold');
-    doc.text(formatearPesos(monto), 210 - M, y, { align: 'right' });
-    y += 5.5;
-    doc.setDrawColor(...BORDE);
-    doc.setLineWidth(0.15);
-    doc.line(M, y - 1, 210 - M, y - 1);
+    doc.setFontSize(8);
+    doc.setTextColor(...BLK);
+    doc.text(formatearPesos(monto), M + W - P, cY + 3.5, { align: 'right' });
+
+    doc.setDrawColor(...SEP);
+    doc.setLineWidth(0.2);
+    doc.line(M + P, cY + CROW_H - 0.3, M + W - P, cY + CROW_H - 0.3);
+
+    cY += CROW_H;
   }
 
-  y += 2;
-  doc.setDrawColor(...ROJO);
-  doc.setLineWidth(0.6);
-  doc.line(M, y, 210 - M, y);
-  y += 5;
+  // Fila total
+  cY += 2;
+  doc.setDrawColor(...BLK);
+  doc.setLineWidth(0.5);
+  doc.line(M + P, cY, M + W - P, cY);
+  cY += 5;
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(...BLK);
+  doc.text('TOTAL', M + P, cY);
+
   doc.setFont('courier', 'bold');
-  doc.setFontSize(8);
-  doc.setTextColor(...NEGRO);
-  doc.text('TOTAL', M, y);
-  doc.setTextColor(...ROJO);
-  doc.text(formatearPesos(resultadoActual.total), 210 - M, y, { align: 'right' });
-  y += 10;
+  doc.setFontSize(9);
+  doc.setTextColor(...RED);
+  doc.text(formatearPesos(r.total), M + W - P, cY, { align: 'right' });
 
-  // ── BLOQUE 04 PLAN DE OBRA (GANTT) ────────────────────────────────────────
+  y += DESG_H;
+
+  // ── 10. Bloque observaciones + firma ──────────────────────────────────────
+  y += GAP;
+  const OBS_H = 35;
+  blkRect(M, y, W, OBS_H);
+
   doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('04 \xB7 PLAN DE OBRA \xB7 ESQUEMA REFERENCIAL', M, y);
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
-  doc.line(M, y + 2.5, 210 - M, y + 2.5);
-  y += 8;
+  doc.setFontSize(6);
+  doc.setTextColor(...G38);
+  doc.text('04 — OBSERVACIONES', M + P, y + P + 2.5);
 
-  const etapas = [
-    ['TR\xC1MITES',     '25%', 0,    0.15],
-    ['FUNDACIONES',     '30%', 0.15, 0.30],
-    ['ESTRUCTURA',      '20%', 0.45, 0.25],
-    ['INSTALACIONES',   '15%', 0.70, 0.18],
-    ['TERMINACIONES',   '10%', 0.88, 0.12],
-  ];
-
-  const barraX = M + 36;
-  const barraW = ANCHO - 36;
-  const barraH = 3.5;
-
-  for (const [nombre, pct, inicio, duracion] of etapas) {
-    doc.setFont('courier', 'normal');
-    doc.setFontSize(6.5);
-    doc.setTextColor(...NEGRO);
-    doc.text(nombre, M, y + 3);
-
-    // Fondo barra
-    doc.setFillColor(225, 223, 216);
-    doc.rect(barraX, y, barraW, barraH, 'F');
-
-    // Barra de la etapa
-    doc.setFillColor(...NEGRO);
-    doc.rect(barraX + inicio * barraW, y, duracion * barraW, barraH, 'F');
-
-    // Porcentaje de desembolso en rojo
-    doc.setFont('courier', 'bold');
-    doc.setFontSize(6);
-    doc.setTextColor(...ROJO);
-    doc.text(pct, barraX + (inicio + duracion / 2) * barraW, y + barraH + 3.5, { align: 'center' });
-
-    y += 11;
+  const obsTexto = document.getElementById('observaciones')?.value?.trim() || '';
+  if (obsTexto) {
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    doc.setTextColor(...G55);
+    const lineas = doc.splitTextToSize(obsTexto, W - P * 2);
+    doc.text(lineas, M + P, y + P + SEC_H + 2);
+  } else {
+    doc.setFont('helvetica', 'italic');
+    doc.setFontSize(8);
+    doc.setTextColor(...G30);
+    doc.text('Sin observaciones adicionales.', M + P, y + P + SEC_H + 2);
   }
 
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('Porcentajes referenciales de desembolso, se acuerdan con el comitente.', M, y);
-  y += 9;
-
-  // ── BLOQUE 05 OBSERVACIONES ───────────────────────────────────────────────
-  const obsTexto = (document.getElementById('observaciones')?.value.trim()) || 'Sin observaciones adicionales.';
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('05 \xB7 OBSERVACIONES', M, y);
-  doc.setDrawColor(...BORDE);
-  doc.setLineWidth(0.4);
-  doc.line(M, y + 2.5, 210 - M, y + 2.5);
-  y += 8;
-
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(...NEGRO);
-  const lineasObs = doc.splitTextToSize(obsTexto, ANCHO);
-  doc.text(lineasObs, M, y);
-  y += lineasObs.length * 5 + 6;
-
-  // ── FOOTER ────────────────────────────────────────────────────────────────
-  const footerY = 275;
-  doc.setDrawColor(...BORDE);
+  // Firma (mitad inferior, alineada a la derecha)
+  const sigX = M + W - P - 55;
+  const sigY = y + OBS_H - P - 10;
+  doc.setDrawColor(...G30);
   doc.setLineWidth(0.3);
-  doc.line(M, footerY, 210 - M, footerY);
-
-  // Aviso legal con borde-left rojo
-  doc.setDrawColor(...ROJO);
-  doc.setLineWidth(1.2);
-  doc.line(M, footerY + 4, M, footerY + 13);
+  doc.line(sigX, sigY, M + W - P, sigY);
 
   doc.setFont('courier', 'normal');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...GRIS);
-  doc.text('Valores referenciales segun datos del IEC/CPI Cordoba.', M + 4, footerY + 7.5);
-  doc.text('No constituyen presupuesto definitivo de obra.', M + 4, footerY + 12);
+  doc.setFontSize(6);
+  doc.setTextColor(...G40);
+  doc.text('FIRMA DEL PROFESIONAL', sigX + 27.5, sigY + 4, { align: 'center' });
 
-  // Firma
-  doc.setDrawColor(...BORDE);
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(5);
+  doc.setTextColor(...G28);
+  doc.text('MATR\xCDCULA \xB7 COLEGIO DE ARQUITECTOS CBA', sigX + 27.5, sigY + 7.5, { align: 'center' });
+
+  y += OBS_H;
+
+  // ── 11. Línea divisoria ───────────────────────────────────────────────────
+  y += 2;
+  doc.setDrawColor(...DIV);
   doc.setLineWidth(0.3);
-  const firmaX = 210 - M - 55;
-  doc.line(firmaX, footerY + 12, 210 - M, footerY + 12);
-  doc.setFont('courier', 'normal');
-  doc.setFontSize(5.5);
-  doc.setTextColor(...GRIS);
-  doc.text('FIRMA DEL PROFESIONAL', firmaX + 27.5, footerY + 15.5, { align: 'center' });
-  doc.text('MATR\xCDCULA \xB7 COLEGIO DE ARQUITECTOS CBA', firmaX + 27.5, footerY + 19, { align: 'center' });
+  doc.line(M, y, 210 - M, y);
 
-  const nombre = `presupuesto-${new Date().toISOString().substring(0, 10)}.pdf`;
-  doc.save(nombre);
+  y += 4;
+
+  // ── 12. Footer ────────────────────────────────────────────────────────────
+  // Línea vertical roja (0.8pt, 8pt de alto ≈ 2.83mm)
+  doc.setDrawColor(...RED);
+  doc.setLineWidth(0.8);
+  doc.line(M, y, M, y + 2.83);
+
+  doc.setFont('courier', 'normal');
+  doc.setFontSize(6);
+  doc.setTextColor(...G40);
+  doc.text(
+    'Valores referenciales seg\xFAn IEC / CPI C\xF3rdoba. No constituyen presupuesto definitivo. Honorarios al 5% \xB7 acordados con el comitente.',
+    M + 3, y + 2,
+  );
+
+  doc.save(`presupuesto-${new Date().toISOString().substring(0, 10)}.pdf`);
 }
 
 document.getElementById('btnExportarPDF').addEventListener('click', generarPDF);
